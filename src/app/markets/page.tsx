@@ -15,11 +15,11 @@ const marketTypes: MarketType[] = [
   },
   {
     id: '2',
-    title: 'Pool Grupal',
-    description: 'Fondos compartidos con dinámicas de liquidez grupal',
-    icon: '👥',
-    iconColor: 'text-green-400',
-    backgroundColor: 'from-green-900/20 to-green-800/10',
+    title: 'Group Balanced',
+    description: 'Grupos equilibrados automáticamente con dinámicas de liquidez grupal',
+    icon: '⚖️',
+    iconColor: 'text-blue-400',
+    backgroundColor: 'from-blue-900/20 to-blue-800/10',
     marketsCount: 8,
     totalVolume: '$22,890'
   },
@@ -116,8 +116,8 @@ export default function MarketsPage() {
                   2
                 </div>
                 <div>
-                  <h4 className="text-white font-medium">Pool Grupal</h4>
-                  <p className="text-gray-400 text-sm">Fondos compartidos donde todos los participantes compiten por el premio total</p>
+                  <h4 className="text-white font-medium">Group Balanced</h4>
+                  <p className="text-gray-400 text-sm">Grupos equilibrados donde los participantes compiten con oportunidades balanceadas</p>
                 </div>
               </div>
             </div>

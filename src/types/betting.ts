@@ -15,7 +15,7 @@ export interface BettingChallenge {
   timeRemaining: string;
   creator: string;
   odds: string;
-  category: string;
+  league: string;
   sport: string;
   endDate: string;
   icon: string;
@@ -74,18 +74,39 @@ export interface UserProfile {
   avatar?: string;
 }
 
-// Nuevos tipos para el protocolo completo
+// Tipos del protocolo según el contrato desplegado
 export enum BetType {
-  SIMPLE = 'SIMPLE',
-  TOURNAMENT = 'TOURNAMENT',
-  GROUP_BALANCED = 'GROUP_BALANCED',
-  ONE_VS_ONE = 'ONE_VS_ONE'
+  SIMPLE = 0,
+  TOURNAMENT = 1,
+  GROUP_BALANCED = 2,
+  ONE_VS_ONE = 3
 }
 
 export enum ResolutionMode {
-  EXACT = 'EXACT',
-  CLOSEST = 'CLOSEST',
-  MULTI_WINNER = 'MULTI_WINNER'
+  EXACT = 0,
+  CLOSEST = 1,
+  MULTI_WINNER = 2
+}
+
+export enum OneVsOneMode {
+  CLASSIC = 0,
+  MARKET = 1
+}
+
+export enum TournamentType {
+  LEAGUE = 'LEAGUE',
+  KNOCKOUT = 'KNOCKOUT'
+}
+
+// Información detallada de los modos de resolución
+export interface ResolutionModeInfo {
+  name: string;
+  icon: string;
+  description: string;
+  example: string;
+  difficulty: 'Fácil' | 'Medio' | 'Difícil';
+  winChance: 'Alta' | 'Media' | 'Baja';
+  prizeDistribution: string;
 }
 
 export enum BetStatus {
@@ -145,4 +166,52 @@ export interface UserBalance {
   locked: string;
   available: string;
   pendingRewards: string;
+}
+
+// Configuración para Battle Royal con múltiples ganadores
+export interface WinnerConfiguration {
+  position: number; // 1er lugar, 2do lugar, etc.
+  percentage: number; // porcentaje del pozo total
+  label: string; // "1er Lugar", "2do Lugar", etc.
+}
+
+// Configuración específica para cada modo de resolución
+export interface ExactModeConfig {
+  maxWinners: number;
+  winnerDistribution: WinnerConfiguration[];
+  tieBreakMethod: 'SPLIT_PRIZE' | 'NO_TIES';
+}
+
+export interface ClosestModeConfig {
+  proximityType: 'ABSOLUTE' | 'PERCENTAGE' | 'SCALED';
+  allowTies: boolean;
+  tieBreakMethod: 'SPLIT_PRIZE' | 'TIMESTAMP' | 'RANDOM';
+  maxWinners: 1 | 3 | 5; // Solo 1, 3 o 5 ganadores para closest
+}
+
+export interface MultiWinnerModeConfig {
+  positionDistribution: 'FIXED' | 'CUSTOM' | 'PROGRESSIVE';
+  winnerPositions: number; // 3, 5, 10 ganadores
+  prizeDistribution: {
+    position: number;
+    percentage: number;
+  }[];
+  qualificationThreshold?: number; // umbral mínimo para ganar
+}
+
+// Unión de todas las configuraciones posibles
+export type ResolutionModeConfig = ExactModeConfig | ClosestModeConfig | MultiWinnerModeConfig;
+
+// Configuración extendida para retos
+export interface ExtendedBetConfig {
+  id: string;
+  title: string;
+  description: string;
+  betType: BetType;
+  resolutionMode: ResolutionMode;
+  battleRoyalConfig?: BattleRoyalConfig;
+  betAmount: string;
+  maxParticipants: string;
+  endDateTime: string;
+  isPublic: boolean;
 }

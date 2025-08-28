@@ -28,14 +28,14 @@ const marketTypes: MarketType[] = [
   },
   {
     id: '2',
-    title: 'Pool Grupal',
-    description: 'Fondos compartidos con distribución proporcional de premios',
-    icon: '👥',
-    iconColor: 'text-green-400',
-    backgroundColor: 'from-green-900/20 to-green-800/10',
+    title: 'Group Balanced',
+    description: 'Grupos equilibrados automáticamente con distribución justa de premios',
+    icon: '⚖️',
+    iconColor: 'text-blue-400',
+    backgroundColor: 'from-blue-900/20 to-blue-800/10',
     difficulty: 'Intermedio',
     estimatedTime: '8 min',
-    features: ['Liquidez compartida', 'Reparto de ganancias', 'Menor riesgo']
+    features: ['Grupos auto-balanceados', 'Distribución equilibrada', 'Sistema de ranking interno']
   },
   {
     id: '3',

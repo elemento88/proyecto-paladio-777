@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react';
-import { BetType, ResolutionMode } from '@/types/betting';
+import { BetType, ResolutionMode, OneVsOneMode } from '@/types/betting';
 
 interface OneVsOneModalProps {
   isOpen: boolean;
@@ -17,6 +17,8 @@ interface OneVsOneModalProps {
     maxParticipants: number;
     isPublic: boolean;
     targetOpponent: string | null;
+    oneVsOneMode: OneVsOneMode;
+    prediction: number;
   }) => void;
 }
 
@@ -25,9 +27,10 @@ export default function OneVsOneModal({ isOpen, onClose, onCreateChallenge }: On
   const [description, setDescription] = useState('');
   const [stake, setStake] = useState('100');
   const [sport, setSport] = useState('Fútbol');
-  const [endDate, setEndDate] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [targetOpponent, setTargetOpponent] = useState('');
+  const [oneVsOneMode, setOneVsOneMode] = useState<OneVsOneMode>(OneVsOneMode.CLASSIC);
+  const [prediction, setPrediction] = useState('');
 
   if (!isOpen) return null;
 
@@ -44,7 +47,9 @@ export default function OneVsOneModal({ isOpen, onClose, onCreateChallenge }: On
       resolutionMode: ResolutionMode.EXACT,
       maxParticipants: 2,
       isPublic,
-      targetOpponent: targetOpponent || null
+      targetOpponent: targetOpponent || null,
+      oneVsOneMode,
+      prediction: parseFloat(prediction) || 0
     };
 
     onCreateChallenge(challengeData);
@@ -57,6 +62,8 @@ export default function OneVsOneModal({ isOpen, onClose, onCreateChallenge }: On
     setEndDate('');
     setIsPublic(true);
     setTargetOpponent('');
+    setOneVsOneMode(OneVsOneMode.CLASSIC);
+    setPrediction('');
 
     // Redirigir a deportes después de crear el duelo exitosamente
     setTimeout(() => {
@@ -98,6 +105,113 @@ export default function OneVsOneModal({ isOpen, onClose, onCreateChallenge }: On
                 required
               />
             </div>
+
+            {/* Modo OneVsOne */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Modo de Duelo *
+                <span className="text-xs text-gray-400 ml-2">¿Cómo funciona el desafío?</span>
+              </label>
+              
+              <div className="space-y-3">
+                {/* CLASSIC Mode */}
+                <div 
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    oneVsOneMode === OneVsOneMode.CLASSIC 
+                      ? 'border-blue-500 bg-blue-500/10' 
+                      : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
+                  }`}
+                  onClick={() => setOneVsOneMode(OneVsOneMode.CLASSIC)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="radio"
+                          name="oneVsOneMode"
+                          value={OneVsOneMode.CLASSIC}
+                          checked={oneVsOneMode === OneVsOneMode.CLASSIC}
+                          onChange={() => setOneVsOneMode(OneVsOneMode.CLASSIC)}
+                          className="mr-3 text-blue-500"
+                        />
+                        <span className="font-medium text-white">⚔️ Clásico</span>
+                        <span className="ml-2 text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded">
+                          Simple
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">
+                        Duelo directo 1 vs 1. El ganador se lleva todo el pozo.
+                      </p>
+                      <div className="text-xs text-gray-400">
+                        • Apuesta fija para ambos participantes
+                        • Resolución directa: ganador vs perdedor
+                        • Ideal para desafíos entre amigos
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* MARKET Mode */}
+                <div 
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    oneVsOneMode === OneVsOneMode.MARKET 
+                      ? 'border-purple-500 bg-purple-500/10' 
+                      : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
+                  }`}
+                  onClick={() => setOneVsOneMode(OneVsOneMode.MARKET)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="radio"
+                          name="oneVsOneMode"
+                          value={OneVsOneMode.MARKET}
+                          checked={oneVsOneMode === OneVsOneMode.MARKET}
+                          onChange={() => setOneVsOneMode(OneVsOneMode.MARKET)}
+                          className="mr-3 text-purple-500"
+                        />
+                        <span className="font-medium text-white">📈 Mercado</span>
+                        <span className="ml-2 text-xs bg-purple-600/20 text-purple-400 px-2 py-1 rounded">
+                          Avanzado
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">
+                        Otros usuarios pueden hacer ofertas contra tu predicción.
+                      </p>
+                      <div className="text-xs text-gray-400">
+                        • Tú estableces tu predicción y apuesta inicial
+                        • Otros hacen ofertas contra ti con diferentes montos
+                        • Puedes aceptar las mejores ofertas
+                        • Mercado dinámico de predicciones
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tu predicción (solo para Market mode) */}
+            {oneVsOneMode === OneVsOneMode.MARKET && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Tu Predicción *
+                  <span className="text-xs text-gray-400 ml-2">Otros apostarán contra esta predicción</span>
+                </label>
+                <input
+                  type="number"
+                  value={prediction}
+                  onChange={(e) => setPrediction(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  placeholder="Ej: 2.5 (goles totales), 78 (puntos), etc."
+                  required
+                  step="0.1"
+                />
+                <div className="mt-2 text-xs text-gray-400">
+                  💡 Ejemplo: Si predices "2.5 goles totales", otros usuarios podrán apostar que serán más o menos de 2.5 goles.
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -146,17 +260,22 @@ export default function OneVsOneModal({ isOpen, onClose, onCreateChallenge }: On
                 />
               </div>
 
+              {/* Información sobre cierre automático */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Fecha límite *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  required
-                />
+                <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <span className="text-blue-400 mr-3 mt-0.5">🕒</span>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-100 mb-2">Cierre Automático del Duelo</h4>
+                      <div className="text-sm text-blue-200 space-y-1">
+                        <p>• El duelo se cerrará automáticamente cuando comience el evento deportivo</p>
+                        <p>• Para torneos/ligas: se cierra con el primer partido del día</p>
+                        <p>• El horario se sincroniza automáticamente con las APIs deportivas</p>
+                        <p>• No necesitas configurar fecha/hora manualmente</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

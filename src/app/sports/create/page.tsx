@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BetType, ResolutionMode } from '@/types/betting';
@@ -201,7 +201,7 @@ const basketballBetOptions: BetOption[] = [
   }
 ];
 
-export default function CreateBetFromSports() {
+function CreateBetFromSportsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [matchData, setMatchData] = useState<MatchData | null>(null);
@@ -210,7 +210,7 @@ export default function CreateBetFromSports() {
   const [selectedPrediction, setSelectedPrediction] = useState<string>('');
   const [numberValue, setNumberValue] = useState<string>('');
   const [betAmount, setBetAmount] = useState<string>('50');
-  const [maxParticipants, setMaxParticipants] = useState<string>('20');
+  const [maxParticipants, setMaxParticipants] = useState<string>('100');
   const [endDateTime, setEndDateTime] = useState<string>('');
 
   useEffect(() => {
@@ -260,7 +260,7 @@ export default function CreateBetFromSports() {
           
           // Usar la configuración completa guardada
           setBetAmount(config.betAmount || '50');
-          setMaxParticipants(config.maxParticipants || '20');
+          setMaxParticipants(config.maxParticipants || '100');
           if (config.endDateTime) {
             setEndDateTime(config.endDateTime);
           }
@@ -284,16 +284,16 @@ export default function CreateBetFromSports() {
             
             // Configurar valores por defecto basados en el tipo de apuesta
             if (config.id === 'battle-royal') {
-              setMaxParticipants('20');
+              setMaxParticipants('100');
               setBetAmount('50');
-            } else if (config.id === 'pool-grupal') {
-              setMaxParticipants('15');
+            } else if (config.id === 'group-balanced') {
+              setMaxParticipants('100');
               setBetAmount('25');
             } else if (config.id === 'desafio-1v1') {
               setMaxParticipants('2');
               setBetAmount('100');
-            } else if (config.id === 'liga-por-puntos') {
-              setMaxParticipants('50');
+            } else if (config.id === 'torneo-estructurado') {
+              setMaxParticipants('100');
               setBetAmount('25');
             }
           } else {
@@ -629,7 +629,7 @@ export default function CreateBetFromSports() {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Máx. Participantes *
+                Máx. Participantes * (máximo 100)
               </label>
               <input
                 type="number"
@@ -638,7 +638,11 @@ export default function CreateBetFromSports() {
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 min="2"
                 max="100"
+                placeholder="100"
               />
+              <p className="text-xs text-gray-400 mt-1">
+                El protocolo limita a máximo 100 participantes por reto
+              </p>
             </div>
 
             <div>
@@ -721,7 +725,7 @@ export default function CreateBetFromSports() {
               {/* Apuesta ejemplo 2 */}
               <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Pool Grupal</span>
+                  <span className="text-sm font-medium text-white">Group Balanced</span>
                   <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Llenándose</span>
                 </div>
                 <div className="text-xs text-gray-400">Total de Goles (Más/Menos)</div>
@@ -749,7 +753,7 @@ export default function CreateBetFromSports() {
               {/* Apuesta ejemplo 4 */}
               <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Pool Grupal</span>
+                  <span className="text-sm font-medium text-white">Group Balanced</span>
                   <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Activa</span>
                 </div>
                 <div className="text-xs text-gray-400">Total de Córners</div>
@@ -792,5 +796,20 @@ export default function CreateBetFromSports() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateBetFromSports() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#1a1d29] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Cargando página de creación...</p>
+        </div>
+      </div>
+    }>
+      <CreateBetFromSportsContent />
+    </Suspense>
   );
 }

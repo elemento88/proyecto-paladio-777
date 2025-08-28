@@ -19,34 +19,34 @@ const betTypes: BetTypeCard[] = [
   {
     id: 'battle-royal',
     title: 'Battle Royal',
-    description: 'Todos contra todos - el ganador se lleva todo el pozo',
+    description: 'Todos contra todos - hasta 100 participantes compiten',
     icon: '⚔️',
     difficulty: 'Básico',
     difficultyColor: 'text-green-400',
     time: '5 min',
     characteristics: [
-      'Múltiples participantes',
-      'Ganador único', 
-      'Pozo completo'
+      'Hasta 100 participantes',
+      'Ganadores configurables', 
+      'Distribución personalizada'
     ],
     buttonColor: 'bg-green-600 hover:bg-green-700',
     buttonText: 'Completar Battle Royal'
   },
   {
-    id: 'pool-grupal',
-    title: 'Pool Grupal',
-    description: 'Fondos compartidos con distribución proporcional de premios',
-    icon: '👥',
+    id: 'group-balanced',
+    title: 'Group Balanced',
+    description: 'Grupos equilibrados automáticamente - hasta 1,000 participantes en 10 grupos',
+    icon: '⚖️',
     difficulty: 'Intermedio',
-    difficultyColor: 'text-yellow-400',
+    difficultyColor: 'text-blue-400',
     time: '8 min',
     characteristics: [
-      'Liquidez compartida',
-      'Reparto de ganancias',
-      'Menor riesgo'
+      'Hasta 100 por grupo (10 grupos)',
+      'Auto-balanceado inteligente',
+      'Sistema de ranking interno'
     ],
-    buttonColor: 'bg-yellow-600 hover:bg-yellow-700',
-    buttonText: 'Completar Pool Grupal'
+    buttonColor: 'bg-blue-600 hover:bg-blue-700',
+    buttonText: 'Completar Group Balanced'
   },
   {
     id: 'prediccion-simple',
@@ -97,20 +97,20 @@ const betTypes: BetTypeCard[] = [
     buttonText: 'Completar Desafío 1v1'
   },
   {
-    id: 'liga-por-puntos',
-    title: 'Liga por Puntos',
-    description: 'Sistema de puntuación acumulativa a través de múltiples eventos',
+    id: 'torneo-estructurado',
+    title: 'Torneo Estructurado',
+    description: 'Torneos LEAGUE o KNOCKOUT - hasta 100 participantes',
     icon: '🏆',
     difficulty: 'Avanzado',
-    difficultyColor: 'text-red-400',
+    difficultyColor: 'text-purple-400',
     time: '15 min',
     characteristics: [
-      'Múltiples eventos',
-      'Puntuación acumulada',
-      'Temporada completa'
+      'Liga o Eliminación Directa',
+      'Hasta 100 participantes',
+      'Brackets automáticos'
     ],
-    buttonColor: 'bg-red-600 hover:bg-red-700',
-    buttonText: 'Completar Liga por Puntos'
+    buttonColor: 'bg-purple-600 hover:bg-purple-700',
+    buttonText: 'Completar Torneo'
   }
 ];
 
