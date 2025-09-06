@@ -85,7 +85,8 @@ export enum BetType {
 export enum ResolutionMode {
   EXACT = 0,
   CLOSEST = 1,
-  MULTI_WINNER = 2
+  MULTI_WINNER = 2,
+  GROUP_WINNER = 3
 }
 
 export enum OneVsOneMode {

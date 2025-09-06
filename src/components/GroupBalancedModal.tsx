@@ -153,7 +153,7 @@ export default function GroupBalancedModal({ isOpen, onClose, onCreateChallenge 
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Apuesta por participante (USDC) *
+                  Reto por participante (USDC) *
                 </label>
                 <input
                   type="number"
@@ -298,7 +298,7 @@ export default function GroupBalancedModal({ isOpen, onClose, onCreateChallenge 
                         onChange={() => setBalancingMethod('STAKES_BASED')}
                         className="mr-2"
                       />
-                      <span className="font-medium text-white">💰 Basado en Apuestas</span>
+                      <span className="font-medium text-white">💰 Basado en Retos</span>
                     </div>
                     <p className="text-xs text-gray-400 ml-6">
                       {getBalancingExplanation()}
@@ -438,7 +438,7 @@ export default function GroupBalancedModal({ isOpen, onClose, onCreateChallenge 
                   <span className="text-white">{numGroups} grupos de {groupSize}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Apuesta individual:</span>
+                  <span className="text-gray-400">Reto individual:</span>
                   <span className="text-white">${stake} USDC</span>
                 </div>
                 <div className="flex justify-between">
@@ -454,7 +454,7 @@ export default function GroupBalancedModal({ isOpen, onClose, onCreateChallenge 
                   <span className="text-blue-400">{
                     balancingMethod === 'SKILL_BASED' ? 'Por Habilidad' :
                     balancingMethod === 'RANDOM' ? 'Aleatorio' :
-                    'Por Apuestas'
+                    'Por Retos'
                   }</span>
                 </div>
               </div>

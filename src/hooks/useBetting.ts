@@ -1,344 +1,321 @@
-import { useState, useCallback } from 'react';
-import { ethers } from 'ethers';
-import { useWeb3 } from './useWeb3';
-import { BetType, ResolutionMode, OneVsOneMode, TournamentType } from '@/config/contracts';
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from './useAuth'
+import { BetType, ResolutionMode, BetStatus } from '@/types/betting'
 
-export interface BetInfo {
-  id: number;
-  betType: BetType;
-  resolutionMode: ResolutionMode;
-  stakeAmount: string;
-  maxParticipants: number;
-  locked: boolean;
-  resolved: boolean;
-  winningTeam: number;
-  participants?: string[];
+interface BettingChallenge {
+  id: string
+  title: string
+  description?: string
+  bet_type: BetType
+  resolution_mode: ResolutionMode
+  creator_id: string
+  sport_id: string
+  league_id: string
+  stake_amount: number
+  min_participants: number
+  max_participants: number
+  current_participants: number
+  end_date: string
+  lock_date?: string
+  outcome_value?: number
+  status: BetStatus
+  is_public: boolean
+  icon: string
+  icon_bg: string
+  total_pool: number
+  created_at: string
+  updated_at: string
+  // Joined data
+  sport?: { name: string; slug: string; icon: string }
+  league?: { name: string; slug: string; icon: string; country: string }
+  creator?: { username?: string; wallet_address?: string }
 }
 
-export const useBetting = () => {
-  const { bettingContract, usdcContract, account, isConnected, isCorrectNetwork, updateBalances } = useWeb3();
-  const [loading, setLoading] = useState(false);
+interface UserBet {
+  id: string
+  challenge_id: string
+  user_id: string
+  prediction_value?: number
+  stake_amount: number
+  potential_winnings?: number
+  actual_winnings: number
+  position?: number
+  is_winner: boolean
+  placed_at: string
+  resolved_at?: string
+  // Joined data
+  challenge?: BettingChallenge
+}
 
-  // Crear apuesta simple
-  const createSimpleBet = useCallback(async (
-    resolutionMode: ResolutionMode,
-    stakeAmount: string,
-    maxParticipants: number
-  ) => {
-    if (!bettingContract || !usdcContract || !account) {
-      throw new Error('Wallet no conectado');
-    }
+export function useBetting() {
+  const { user, profile } = useAuth()
+  const [challenges, setChallenges] = useState<BettingChallenge[]>([])
+  const [userBets, setUserBets] = useState<UserBet[]>([])
+  const [loading, setLoading] = useState(true)
 
-    if (!isCorrectNetwork) {
-      throw new Error('Red incorrecta');
-    }
-
-    setLoading(true);
+  // Fetch active challenges
+  const fetchChallenges = async () => {
     try {
-      const stakeAmountWei = ethers.utils.parseEther(stakeAmount);
+      const { data, error } = await supabase
+        .from('betting_challenges')
+        .select(`
+          *,
+          sport:sports_categories(name, slug, icon),
+          league:leagues(name, slug, icon, country),
+          creator:user_profiles(username, wallet_address)
+        `)
+        .eq('status', 'ACTIVE')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
 
-      // Aprobar USDC primero
-      const approveTx = await usdcContract.approve(bettingContract.address, stakeAmountWei);
-      await approveTx.wait();
+      if (error) throw error
+      setChallenges(data || [])
+    } catch (error) {
+      console.error('Error fetching challenges:', error)
+    }
+  }
 
-      // Crear apuesta
-      const createTx = await bettingContract.createSimpleBet(
-        resolutionMode,
-        stakeAmountWei,
-        maxParticipants
-      );
+  // Fetch user's bets
+  const fetchUserBets = async () => {
+    if (!user) return
 
-      const receipt = await createTx.wait();
+    try {
+      const { data, error } = await supabase
+        .from('user_bets')
+        .select(`
+          *,
+          challenge:betting_challenges(
+            *,
+            sport:sports_categories(name, slug, icon),
+            league:leagues(name, slug, icon, country)
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('placed_at', { ascending: false })
+
+      if (error) throw error
+      setUserBets(data || [])
+    } catch (error) {
+      console.error('Error fetching user bets:', error)
+    }
+  }
+
+  // Create new betting challenge
+  const createChallenge = async (challengeData: {
+    title: string
+    description?: string
+    bet_type: BetType
+    resolution_mode: ResolutionMode
+    sport_id: string
+    league_id: string
+    stake_amount: number
+    max_participants: number
+    end_date: string
+    is_public?: boolean
+  }) => {
+    if (!user) return { error: 'User not authenticated' }
+
+    try {
+      const { data, error } = await supabase
+        .from('betting_challenges')
+        .insert({
+          ...challengeData,
+          creator_id: user.id,
+          is_public: challengeData.is_public ?? true
+        })
+        .select()
+        .single()
+
+      if (error) throw error
       
-      // Buscar el evento BetCreated
-      const betCreatedEvent = receipt.events?.find((event: any) => event.event === 'BetCreated');
-      const betId = betCreatedEvent ? betCreatedEvent.args.betId.toNumber() : null;
-
-      await updateBalances();
-
-      return {
-        transaction: createTx,
-        receipt,
-        betId,
-      };
-    } catch (error) {
-      console.error('Error creating simple bet:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [bettingContract, usdcContract, account, isCorrectNetwork, updateBalances]);
-
-  // Unirse a una apuesta
-  const joinBet = useCallback(async (betId: number, predictedValue: number) => {
-    if (!bettingContract || !usdcContract || !account) {
-      throw new Error('Wallet no conectado');
-    }
-
-    setLoading(true);
-    try {
-      // Obtener información de la apuesta para el monto
-      const bet = await getBet(betId);
-      const stakeAmountWei = ethers.utils.parseEther(bet.stakeAmount);
-
-      // Aprobar USDC
-      const approveTx = await usdcContract.approve(bettingContract.address, stakeAmountWei);
-      await approveTx.wait();
-
-      // Unirse a la apuesta
-      const joinTx = await bettingContract.joinBet(betId, predictedValue);
-      const receipt = await joinTx.wait();
-
-      await updateBalances();
-
-      return {
-        transaction: joinTx,
-        receipt,
-      };
-    } catch (error) {
-      console.error('Error joining bet:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [bettingContract, usdcContract, account, updateBalances]);
-
-  // Crear apuesta 1 vs 1
-  const createOneVsOneBet = useCallback(async (
-    prediction: number,
-    stakeAmount: string,
-    mode: OneVsOneMode
-  ) => {
-    if (!bettingContract || !usdcContract || !account) {
-      throw new Error('Wallet no conectado');
-    }
-
-    setLoading(true);
-    try {
-      const stakeAmountWei = ethers.utils.parseEther(stakeAmount);
+      // Refresh challenges
+      await fetchChallenges()
       
-      // Aprobar USDC
-      const approveTx = await usdcContract.approve(bettingContract.address, stakeAmountWei);
-      await approveTx.wait();
-
-      // Crear apuesta
-      const createTx = await bettingContract.createOneVsOneBet(prediction, stakeAmountWei, mode);
-      const receipt = await createTx.wait();
-
-      const betCreatedEvent = receipt.events?.find((event: any) => event.event === 'OneVsOneBetCreated');
-      const betId = betCreatedEvent ? betCreatedEvent.args.betId.toNumber() : null;
-
-      await updateBalances();
-
-      return {
-        transaction: createTx,
-        receipt,
-        betId,
-      };
-    } catch (error) {
-      console.error('Error creating 1 vs 1 bet:', error);
-      throw error;
-    } finally {
-      setLoading(false);
+      return { data, error: null }
+    } catch (error: any) {
+      return { data: null, error: error.message }
     }
-  }, [bettingContract, usdcContract, account, updateBalances]);
+  }
 
-  // Hacer oferta contra apuesta 1 vs 1
-  const offerAgainstBet = useCallback(async (betId: number, amount: string) => {
-    if (!bettingContract || !usdcContract || !account) {
-      throw new Error('Wallet no conectado');
-    }
-
-    setLoading(true);
-    try {
-      const amountWei = ethers.utils.parseEther(amount);
-      
-      // Aprobar USDC
-      const approveTx = await usdcContract.approve(bettingContract.address, amountWei);
-      await approveTx.wait();
-
-      // Hacer oferta
-      const offerTx = await bettingContract.offerAgainstBet(betId, amountWei);
-      const receipt = await offerTx.wait();
-
-      const offerMadeEvent = receipt.events?.find((event: any) => event.event === 'OfferMade');
-      const offerId = offerMadeEvent ? offerMadeEvent.args.offerId.toNumber() : null;
-
-      await updateBalances();
-
-      return {
-        transaction: offerTx,
-        receipt,
-        offerId,
-      };
-    } catch (error) {
-      console.error('Error making offer:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [bettingContract, usdcContract, account, updateBalances]);
-
-  // Obtener información de una apuesta
-  const getBet = useCallback(async (betId: number): Promise<BetInfo> => {
-    if (!bettingContract) {
-      throw new Error('Contrato no inicializado');
-    }
+  // Place a bet on a challenge
+  const placeBet = async (challengeId: string, predictionValue?: number, stakeAmount?: number) => {
+    if (!user) return { error: 'User not authenticated' }
 
     try {
-      const bet = await bettingContract.bets(betId);
-      return {
-        id: betId,
-        betType: bet.betType,
-        resolutionMode: bet.resolutionMode,
-        stakeAmount: ethers.utils.formatEther(bet.stakeAmount),
-        maxParticipants: bet.maxParticipants,
-        locked: bet.locked,
-        resolved: bet.resolved,
-        winningTeam: bet.winningTeam,
-      };
-    } catch (error) {
-      console.error(`Error getting bet ${betId}:`, error);
-      throw error;
-    }
-  }, [bettingContract]);
+      // Get challenge details
+      const { data: challenge, error: challengeError } = await supabase
+        .from('betting_challenges')
+        .select('*')
+        .eq('id', challengeId)
+        .single()
 
-  // Obtener número total de apuestas
-  const getBetCount = useCallback(async (): Promise<number> => {
-    if (!bettingContract) {
-      throw new Error('Contrato no inicializado');
-    }
+      if (challengeError) throw challengeError
 
+      const finalStakeAmount = stakeAmount || challenge.stake_amount
+
+      // Check if user has enough balance
+      if (profile && profile.balance_usdc < finalStakeAmount) {
+        return { error: 'Insufficient balance' }
+      }
+
+      // Place the bet
+      const { data, error } = await supabase
+        .from('user_bets')
+        .insert({
+          challenge_id: challengeId,
+          user_id: user.id,
+          prediction_value: predictionValue,
+          stake_amount: finalStakeAmount
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update user balance and challenge participants
+      await Promise.all([
+        supabase
+          .from('user_profiles')
+          .update({ 
+            balance_usdc: (profile?.balance_usdc || 0) - finalStakeAmount,
+            balance_locked: (profile?.balance_locked || 0) + finalStakeAmount
+          })
+          .eq('id', user.id),
+        
+        supabase
+          .from('betting_challenges')
+          .update({ 
+            current_participants: challenge.current_participants + 1,
+            total_pool: challenge.total_pool + finalStakeAmount
+          })
+          .eq('id', challengeId)
+      ])
+
+      // Create transaction record
+      await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          bet_id: data.id,
+          challenge_id: challengeId,
+          type: 'BET_PLACED',
+          amount: -finalStakeAmount,
+          balance_before: profile?.balance_usdc || 0,
+          balance_after: (profile?.balance_usdc || 0) - finalStakeAmount
+        })
+
+      // Refresh data
+      await Promise.all([fetchChallenges(), fetchUserBets()])
+
+      return { data, error: null }
+    } catch (error: any) {
+      return { data: null, error: error.message }
+    }
+  }
+
+  // Get sports categories
+  const fetchSportsCategories = async () => {
     try {
-      const count = await bettingContract.betCount();
-      return count.toNumber();
-    } catch (error) {
-      console.error('Error getting bet count:', error);
-      throw error;
-    }
-  }, [bettingContract]);
+      const { data, error } = await supabase
+        .from('sports_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
 
-  // Mintear USDC (solo para desarrollo)
-  const mintUSDC = useCallback(async (amount: string) => {
-    if (!bettingContract || !account) {
-      throw new Error('Wallet no conectado');
+      if (error) throw error
+      return { data, error: null }
+    } catch (error: any) {
+      return { data: null, error: error.message }
     }
+  }
 
-    setLoading(true);
+  // Get leagues by sport
+  const fetchLeagues = async (sportId?: string) => {
     try {
-      const amountWei = ethers.utils.parseEther(amount);
-      const mintTx = await bettingContract.mintUSDC(account, amountWei);
-      const receipt = await mintTx.wait();
+      let query = supabase
+        .from('leagues')
+        .select('*, sport:sports_categories(name, slug, icon)')
+        .eq('is_active', true)
+        .order('name')
 
-      await updateBalances();
+      if (sportId && sportId !== 'todos') {
+        query = query.eq('sport_id', sportId)
+      }
 
-      return {
-        transaction: mintTx,
-        receipt,
-      };
-    } catch (error) {
-      console.error('Error minting USDC:', error);
-      throw error;
-    } finally {
-      setLoading(false);
+      const { data, error } = await query
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error: any) {
+      return { data: null, error: error.message }
     }
-  }, [bettingContract, account, updateBalances]);
+  }
 
-  // Crear apuesta grupal balanceada
-  const createBalancedGroupBet = useCallback(async (
-    resolutionMode: ResolutionMode,
-    stakeAmount: string,
-    maxParticipants: number,
-    groupSize: number
-  ) => {
-    if (!bettingContract || !usdcContract || !account) {
-      throw new Error('Wallet no conectado');
+  // Subscribe to real-time updates
+  const subscribeToUpdates = () => {
+    const challengesSubscription = supabase
+      .channel('betting_challenges_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'betting_challenges' },
+        (payload) => {
+          console.log('Challenge updated:', payload)
+          fetchChallenges()
+        }
+      )
+      .subscribe()
+
+    const betsSubscription = user ? supabase
+      .channel('user_bets_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'user_bets',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('User bet updated:', payload)
+          fetchUserBets()
+        }
+      )
+      .subscribe() : null
+
+    return () => {
+      challengesSubscription.unsubscribe()
+      if (betsSubscription) betsSubscription.unsubscribe()
     }
+  }
 
-    setLoading(true);
-    try {
-      const stakeAmountWei = ethers.utils.parseEther(stakeAmount);
-      
-      // Aprobar USDC
-      const approveTx = await usdcContract.approve(bettingContract.address, stakeAmountWei);
-      await approveTx.wait();
-
-      // Crear apuesta grupal
-      const createTx = await bettingContract.createBalancedGroupBet(
-        resolutionMode,
-        stakeAmountWei,
-        maxParticipants,
-        groupSize
-      );
-      const receipt = await createTx.wait();
-
-      const betCreatedEvent = receipt.events?.find((event: any) => event.event === 'BetCreated');
-      const betId = betCreatedEvent ? betCreatedEvent.args.betId.toNumber() : null;
-
-      await updateBalances();
-
-      return {
-        transaction: createTx,
-        receipt,
-        betId,
-      };
-    } catch (error) {
-      console.error('Error creating group bet:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [bettingContract, usdcContract, account, updateBalances]);
-
-  // Crear torneo
-  const createTournament = useCallback(async (
-    tournamentType: TournamentType,
-    resolutionMode: ResolutionMode,
-    maxParticipants: number,
-    allowIdenticalBets: boolean,
-    registrationEndTime: number
-  ) => {
-    if (!bettingContract || !account) {
-      throw new Error('Wallet no conectado');
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true)
+      await fetchChallenges()
+      if (user) {
+        await fetchUserBets()
+      }
+      setLoading(false)
     }
 
-    setLoading(true);
-    try {
-      const createTx = await bettingContract.createTournament(
-        tournamentType,
-        resolutionMode,
-        maxParticipants,
-        allowIdenticalBets,
-        registrationEndTime
-      );
-      const receipt = await createTx.wait();
+    loadData()
+  }, [user])
 
-      const tournamentCreatedEvent = receipt.events?.find((event: any) => event.event === 'TournamentCreated');
-      const tournamentId = tournamentCreatedEvent ? tournamentCreatedEvent.args.tournamentId.toNumber() : null;
+  useEffect(() => {
+    if (!user) return
 
-      return {
-        transaction: createTx,
-        receipt,
-        tournamentId,
-      };
-    } catch (error) {
-      console.error('Error creating tournament:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [bettingContract, account]);
+    const unsubscribe = subscribeToUpdates()
+    return unsubscribe
+  }, [user])
 
   return {
+    challenges,
+    userBets,
     loading,
-    createSimpleBet,
-    joinBet,
-    createOneVsOneBet,
-    offerAgainstBet,
-    createBalancedGroupBet,
-    createTournament,
-    getBet,
-    getBetCount,
-    mintUSDC,
-  };
-};
+    createChallenge,
+    placeBet,
+    fetchSportsCategories,
+    fetchLeagues,
+    refetchChallenges: fetchChallenges,
+    refetchUserBets: fetchUserBets
+  }
+}

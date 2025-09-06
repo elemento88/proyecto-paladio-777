@@ -55,7 +55,7 @@ export default function MarketsPage() {
             ← Volver
           </button>
           <h1 className="text-3xl font-bold text-white mb-2">Tipos de Mercado</h1>
-          <p className="text-gray-400">Explora diferentes modalidades de apuestas disponibles</p>
+          <p className="text-gray-400">Explora diferentes modalidades de retos disponibles</p>
         </div>
 
         {/* Grid de tipos de mercado */}
@@ -108,7 +108,7 @@ export default function MarketsPage() {
                 </div>
                 <div>
                   <h4 className="text-white font-medium">Mercado Simple</h4>
-                  <p className="text-gray-400 text-sm">Apuestas individuales con resolución automática mediante oráculos externos</p>
+                  <p className="text-gray-400 text-sm">Retos individuales con resolución automática mediante oráculos externos</p>
                 </div>
               </div>
               <div className="flex items-start">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { SportCategory, BettingChallenge, Position, UserProfile, BetType, ResolutionMode, OneVsOneMode } from '@/types/betting';
 import { WalletConnection } from '@/components/WalletConnection';
@@ -13,6 +13,18 @@ import MarketOffersModal from '@/components/MarketOffersModal';
 import BetTypeSelector, { BetTypeOption } from '@/components/BetTypeSelector';
 import CreateBetView from '@/components/CreateBetView';
 import { useBalance } from '@/hooks/useBalance';
+import Footer from '@/components/Footer';
+import { useAuth } from '@/hooks/useAuth';
+import { useBetting } from '@/hooks/useBetting';
+import AuthModal from '@/components/AuthModal';
+import BotManager from '@/components/BotManager';
+import BotSimulator from '@/components/BotSimulator';
+import LoginButton from '@/components/LoginButton';
+import TournamentCard from '@/components/TournamentCard';
+import CreateTournamentModal from '@/components/CreateTournamentModal';
+import { useTournaments } from '@/hooks/useTournaments';
+import LiveScores from '@/components/LiveScores';
+import { useSports } from '@/hooks/useSports';
 
 const mockSportsCategories: SportCategory[] = [
   { id: 'todos', name: 'Todos', icon: '🏆', count: 255 },
@@ -25,6 +37,30 @@ const mockSportsCategories: SportCategory[] = [
   { id: 'hockey', name: 'Hockey', icon: '🏒', count: 12 },
   { id: 'rugby', name: 'Rugby', icon: '🏉', count: 8 },
   { id: 'voleibol', name: 'Voleibol', icon: '🏐', count: 10 },
+];
+
+interface League {
+  id: string;
+  name: string;
+  icon: string;
+  sport: string;
+  country: string;
+  count: number;
+}
+
+const mockLeagues: League[] = [
+  { id: 'todas', name: 'Todas las Ligas', icon: '🌍', sport: 'all', country: 'Global', count: 125 },
+  { id: 'premier-league', name: 'Premier League', icon: '⚽', sport: 'futbol', country: 'Inglaterra', count: 22 },
+  { id: 'la-liga', name: 'La Liga', icon: '⚽', sport: 'futbol', country: 'España', count: 18 },
+  { id: 'serie-a', name: 'Serie A', icon: '⚽', sport: 'futbol', country: 'Italia', count: 15 },
+  { id: 'bundesliga', name: 'Bundesliga', icon: '⚽', sport: 'futbol', country: 'Alemania', count: 12 },
+  { id: 'champions-league', name: 'Champions League', icon: '🏆', sport: 'futbol', country: 'Europa', count: 8 },
+  { id: 'nba', name: 'NBA', icon: '🏀', sport: 'baloncesto', country: 'USA', count: 20 },
+  { id: 'euroleague', name: 'EuroLeague', icon: '🏀', sport: 'baloncesto', country: 'Europa', count: 12 },
+  { id: 'atp-tour', name: 'ATP Tour', icon: '🎾', sport: 'tenis', country: 'Mundial', count: 16 },
+  { id: 'wta-tour', name: 'WTA Tour', icon: '🎾', sport: 'tenis', country: 'Mundial', count: 14 },
+  { id: 'nfl', name: 'NFL', icon: '🏈', sport: 'futbol-americano', country: 'USA', count: 18 },
+  { id: 'mlb', name: 'MLB', icon: '⚾', sport: 'beisbol', country: 'USA', count: 10 },
 ];
 
 const mockChallenges: BettingChallenge[] = [
@@ -346,7 +382,14 @@ const mockUser: UserProfile = {
 };
 
 export default function Home() {
+  // Auth and data hooks
+  const { user, signOut } = useAuth()
+  const { challenges } = useBetting()
+  const { tournaments, activeTournaments, runningTournaments } = useTournaments()
+  const { sports, todaysFixtures, liveScores, loading: sportsLoading, error: sportsError } = useSports()
+  
   const [selectedSport, setSelectedSport] = useState('todos');
+  const [selectedLeague, setSelectedLeague] = useState('todas');
   const [mainTab, setMainTab] = useState('retos'); // puede ser 'retos', 'crear' o 'configurar'
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
@@ -357,6 +400,11 @@ export default function Home() {
   const [showMarketOffersModal, setShowMarketOffersModal] = useState(false);
   const [selectedMarketChallenge, setSelectedMarketChallenge] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showBotManager, setShowBotManager] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showCreateTournamentModal, setShowCreateTournamentModal] = useState(false);
+  const [tournamentFilter, setTournamentFilter] = useState<'all' | 'active' | 'upcoming' | 'finished'>('all');
+  const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
   // const [showOneVsOneModal, setShowOneVsOneModal] = useState(false);
   // const [showGroupBalancedModal, setShowGroupBalancedModal] = useState(false);
   // const [showTournamentModal, setShowTournamentModal] = useState(false);
@@ -365,7 +413,12 @@ export default function Home() {
   const [activeChallenges, setActiveChallenges] = useState(mockChallenges);
   const { addTransaction, updateBalance } = useBalance();
 
-  // Estados para la configuración de apuesta
+  // Resetear liga seleccionada cuando cambia el deporte
+  useEffect(() => {
+    setSelectedLeague('todas');
+  }, [selectedSport]);
+
+  // Estados para la configuración de reto
   const [selectedBetTypeCard, setSelectedBetTypeCard] = useState<any>(null);
   const [configFormData, setConfigFormData] = useState({
     title: '',
@@ -375,6 +428,15 @@ export default function Home() {
     maxGroups: '5',
     resolutionMode: 'EXACT',
     isPublic: true,
+    acceptVariableOffers: false, // Para Predicción Simple: aceptar ofertas variables o solo iguales
+    // Configuraciones específicas del Torneo Estructurado
+    tournamentType: 'LEAGUE' as 'LEAGUE' | 'KNOCKOUT' | 'HYBRID',
+    tournamentParticipants: '16',
+    tournamentPrizeDistribution: 'TOP3' as 'WINNER_TAKES_ALL' | 'TOP3' | 'TOP5' | 'TOP10',
+    tournamentDuration: 'MEDIUM' as 'FAST' | 'MEDIUM' | 'LONG' | 'SEASON',
+    allowTournamentSpectators: false,
+    enableTournamentChat: true,
+    allowIdenticalPredictions: false,
     // Configuraciones específicas por modo de resolución
     exactModeConfig: {
       maxWinners: '1',
@@ -434,9 +496,10 @@ export default function Home() {
     // Agregar transacción
     addTransaction({
       type: 'BET_PLACED',
-      betId: selectedChallenge,
+      betId: selectedChallenge || '',
       betTitle: challenge.title,
       amount: `-${betAmount}.00`,
+      date: new Date().toLocaleDateString(),
       status: 'COMPLETED'
     });
 
@@ -460,45 +523,54 @@ export default function Home() {
     sport: string;
     creator: string;
   }) => {
+    // Validar que betData y sus propiedades no sean null
+    if (!betData) {
+      console.error('betData is null or undefined');
+      return;
+    }
+    
+    // Asegurar que sport tenga un valor por defecto
+    const sport = betData.sport || 'Fútbol';
     const newChallenge: BettingChallenge = {
       id: (activeChallenges.length + 1).toString(),
       title: betData.title,
-      type: betData.betType === 'SIMPLE' ? 'Battle Royal' : 
-            betData.betType === 'TOURNAMENT' ? 'Tournament' :
-            betData.betType === 'GROUP_BALANCED' ? 'Group Balanced' : '1v1 Duel',
-      description: betData.description || `${betData.sport} - Reto personalizado`,
+      type: betData.betType === BetType.SIMPLE ? 'Battle Royal' : 
+            betData.betType === BetType.TOURNAMENT ? 'Tournament' :
+            betData.betType === BetType.GROUP_BALANCED ? 'Group Balanced' : '1v1 Duel',
+      description: betData.description || `${sport} - Reto personalizado`,
       stake: `$${betData.stake}`,
       participants: `1/${betData.maxParticipants}`,
       timeRemaining: '2 días',
       creator: betData.creator,
       odds: '2.00x',
-      league: betData.sport,
-      sport: betData.sport,
+      league: sport,
+      sport: sport,
       endDate: new Date(betData.endDate).toLocaleDateString('es-ES', { 
         day: '2-digit', 
         month: '2-digit', 
         hour: '2-digit', 
         minute: '2-digit' 
       }),
-      icon: betData.sport === 'Fútbol' ? '⚽' :
-            betData.sport === 'Baloncesto' ? '🏀' :
-            betData.sport === 'Tenis' ? '🎾' :
-            betData.sport === 'Béisbol' ? '⚾' :
-            betData.sport === 'Fútbol Americano' ? '🏈' : '🏆',
+      icon: sport === 'Fútbol' ? '⚽' :
+            sport === 'Baloncesto' ? '🏀' :
+            sport === 'Tenis' ? '🎾' :
+            sport === 'Béisbol' ? '⚾' :
+            sport === 'Fútbol Americano' ? '🏈' : '🏆',
       iconBg: 'bg-blue-500'
     };
     
-    // Agregar transacción por crear apuesta
+    // Agregar transacción por crear reto
     addTransaction({
       type: 'BET_PLACED',
       betId: newChallenge.id,
       betTitle: newChallenge.title,
       amount: `-${betData.stake}.00`,
+      date: new Date().toLocaleDateString(),
       status: 'COMPLETED'
     });
 
     // Actualizar balance
-    updateBalance(parseFloat(betData.stake), 'bet');
+    updateBalance(-parseFloat(betData.stake), 'bet');
 
     setActiveChallenges([newChallenge, ...activeChallenges]);
     setShowCreateModal(false);
@@ -539,7 +611,6 @@ export default function Home() {
     // setShowTournamentModal(false);
     
     addTransaction({
-      id: `tx-${Date.now()}`,
       type: 'BET_PLACED',
       betId: newChallenge.id,
       betTitle: newChallenge.title,
@@ -548,7 +619,7 @@ export default function Home() {
       status: 'COMPLETED'
     });
 
-    updateBalance(-challengeData.stake, challengeData.stake);
+    updateBalance(-challengeData.stake, 'bet');
   };
 
   const handleCreateGroupBalanced = (challengeData: {
@@ -572,7 +643,7 @@ export default function Home() {
       description: `${challengeData.description} | Método: ${
         challengeData.balancingMethod === 'SKILL_BASED' ? 'Por Habilidad' :
         challengeData.balancingMethod === 'RANDOM' ? 'Aleatorio' :
-        'Por Apuestas'
+        'Por Retos'
       }`,
       stake: `$${challengeData.stake}`,
       participants: `0/${challengeData.maxParticipants}`,
@@ -591,7 +662,6 @@ export default function Home() {
     // setShowGroupBalancedModal(false);
     
     addTransaction({
-      id: `tx-${Date.now()}`,
       type: 'BET_PLACED',
       betId: newChallenge.id,
       betTitle: newChallenge.title,
@@ -600,7 +670,7 @@ export default function Home() {
       status: 'COMPLETED'
     });
 
-    updateBalance(-challengeData.stake, challengeData.stake);
+    updateBalance(-challengeData.stake, 'bet');
   };
 
   const handleCreateOneVsOne = (challengeData: {
@@ -647,11 +717,12 @@ export default function Home() {
       betId: newChallenge.id,
       betTitle: newChallenge.title,
       amount: `-${challengeData.stake}.00`,
+      date: new Date().toLocaleDateString(),
       status: 'COMPLETED'
     });
 
     // Actualizar balance
-    updateBalance(challengeData.stake, 'bet');
+    updateBalance(-challengeData.stake, 'bet');
 
     setActiveChallenges([newChallenge, ...activeChallenges]);
     // setShowOneVsOneModal(false);
@@ -675,23 +746,21 @@ export default function Home() {
     description: string; 
     icon: string; 
   }) => {
-    // Usar el flujo unificado para todos los tipos de apuesta
+    // Usar el flujo unificado para todos los tipos de reto
     setSelectedBetTypeCard(betTypeCard);
       
-    // Configurar valores por defecto según el tipo de apuesta
+    // Configurar valores por defecto según el tipo de reto
     const defaultValues = {
       maxParticipants: betTypeCard.id === 'battle-royal' ? '100' : 
-                       betTypeCard.id === 'desafio-1v1' ? '2' :
                        betTypeCard.id === 'group-balanced' ? '20' :
-                       betTypeCard.id === 'torneo-estructurado' ? '32' : '20',
+                       betTypeCard.id === 'torneo-estructurado' ? '32' :
+                       betTypeCard.id === 'prediccion-simple' ? '10' : '20',
       maxGroups: betTypeCard.id === 'group-balanced' ? '5' : '1',
       betAmount: betTypeCard.id === 'battle-royal' ? '50' : 
-                 betTypeCard.id === 'desafio-1v1' ? '100' :
                  betTypeCard.id === 'group-balanced' ? '25' :
                  betTypeCard.id === 'torneo-estructurado' ? '25' : '50',
-      resolutionMode: betTypeCard.id === 'mercado-over-under' ? 'CLOSEST' : 
-                      betTypeCard.id === 'battle-royal' ? 'MULTI_WINNER' :
-                      betTypeCard.id === 'group-balanced' ? 'CLOSEST' :
+      resolutionMode: betTypeCard.id === 'battle-royal' ? 'MULTI_WINNER' :
+                      betTypeCard.id === 'group-balanced' ? 'GROUP_WINNER' :
                       betTypeCard.id === 'torneo-estructurado' ? 'MULTI_WINNER' : 'EXACT'
     };
       
@@ -733,11 +802,9 @@ export default function Home() {
       title: selectedBetTypeCard.title,
       description: selectedBetTypeCard.description,
       icon: selectedBetTypeCard.icon,
-      betType: selectedBetTypeCard.id === 'desafio-1v1' ? 'ONE_VS_ONE' : 
-                selectedBetTypeCard.id === 'battle-royal' ? 'SIMPLE' :
+      betType: selectedBetTypeCard.id === 'battle-royal' ? 'SIMPLE' :
                 selectedBetTypeCard.id === 'group-balanced' ? 'GROUP_BALANCED' :
-                selectedBetTypeCard.id === 'prediccion-simple' ? 'SIMPLE' :
-                selectedBetTypeCard.id === 'mercado-over-under' ? 'SIMPLE' : 'SIMPLE',
+                selectedBetTypeCard.id === 'prediccion-simple' ? 'SIMPLE' : 'SIMPLE',
       resolutionMode: configFormData.resolutionMode,
       ...configFormData,
       timestamp: Date.now()
@@ -775,6 +842,38 @@ export default function Home() {
     console.log('Making offer:', { amount, prediction, challengeId: selectedMarketChallenge });
     // Aquí iría la lógica para hacer una nueva oferta en el contrato
     setShowMarketOffersModal(false);
+  };
+
+  // Tournament handlers
+  const handleJoinTournament = (tournamentId: string) => {
+    console.log('Joining tournament:', tournamentId);
+    // Tournament joining logic is handled by TournamentCard component
+  };
+
+  const handleViewTournamentDetails = (tournamentId: string) => {
+    console.log('Viewing tournament details:', tournamentId);
+    setSelectedTournament(tournamentId);
+    // For now, just log - in a real app this would navigate to tournament details page
+  };
+
+  const handleCreateTournamentSuccess = () => {
+    setShowCreateTournamentModal(false);
+    // Optionally switch to tournament tab after creating
+    setMainTab('torneos');
+  };
+
+  // Filter tournaments based on selected filter
+  const getFilteredTournaments = () => {
+    switch (tournamentFilter) {
+      case 'active':
+        return tournaments.filter(t => t.tournament_phase === 'REGISTRATION');
+      case 'upcoming':
+        return runningTournaments;
+      case 'finished':
+        return tournaments.filter(t => t.tournament_phase === 'FINISHED');
+      default:
+        return tournaments;
+    }
   };
 
   // Mock data para ofertas (en una implementación real vendría del contrato)
@@ -855,28 +954,53 @@ export default function Home() {
     return counts;
   };
 
-  // Función para filtrar retos por deporte seleccionado
+  // Función para filtrar retos por deporte y liga seleccionados
   const getFilteredChallenges = () => {
-    if (selectedSport === 'todos') {
-      return activeChallenges;
+    let challenges = activeChallenges;
+
+    // Filtrar por deporte
+    if (selectedSport !== 'todos') {
+      const sportMapping: { [key: string]: string[] } = {
+        'futbol': ['Fútbol'],
+        'baloncesto': ['Baloncesto'],
+        'tenis': ['Tenis'],
+        'beisbol': ['Béisbol'],
+        'futbol-americano': ['Fútbol Americano'],
+        'golf': ['Golf'],
+        'hockey': ['Hockey'],
+        'rugby': ['Rugby'],
+        'voleibol': ['Voleibol']
+      };
+
+      const sportNames = sportMapping[selectedSport] || [];
+      challenges = challenges.filter(challenge => 
+        sportNames.includes(challenge.sport)
+      );
     }
 
-    const sportMapping: { [key: string]: string[] } = {
-      'futbol': ['Fútbol'],
-      'baloncesto': ['Baloncesto'],
-      'tenis': ['Tenis'],
-      'beisbol': ['Béisbol'],
-      'futbol-americano': ['Fútbol Americano'],
-      'golf': ['Golf'],
-      'hockey': ['Hockey'],
-      'rugby': ['Rugby'],
-      'voleibol': ['Voleibol']
-    };
+    // Filtrar por liga
+    if (selectedLeague !== 'todas') {
+      const leagueMapping: { [key: string]: string[] } = {
+        'premier-league': ['Premier League'],
+        'la-liga': ['Liga Española', 'La Liga'],
+        'serie-a': ['Serie A'],
+        'bundesliga': ['Bundesliga'],
+        'champions-league': ['Champions League'],
+        'nba': ['NBA'],
+        'euroleague': ['EuroLeague'],
+        'atp-tour': ['ATP Masters', 'ATP'],
+        'wta-tour': ['WTA'],
+        'nfl': ['NFL'],
+        'mlb': ['MLB']
+      };
 
-    const sportNames = sportMapping[selectedSport] || [];
-    return activeChallenges.filter(challenge => 
-      sportNames.includes(challenge.sport)
-    );
+      const leagueNames = leagueMapping[selectedLeague] || [];
+      challenges = challenges.filter(challenge => 
+        leagueNames.includes(challenge.league)
+      );
+    }
+
+    return challenges;
   };
 
   // Obtener contadores dinámicos y retos filtrados
@@ -888,6 +1012,16 @@ export default function Home() {
     ...sport,
     count: sportCounts[sport.id] || 0
   }));
+
+  // Filtrar ligas según el deporte seleccionado
+  const getFilteredLeagues = () => {
+    if (selectedSport === 'todos') {
+      return mockLeagues;
+    }
+    return mockLeagues.filter(league => league.sport === selectedSport || league.sport === 'all');
+  };
+
+  const filteredLeagues = getFilteredLeagues();
 
   return (
     <div className="min-h-screen bg-[#1a1d29] text-white flex flex-col">
@@ -923,6 +1057,43 @@ export default function Home() {
                     : 'bg-gray-700 text-gray-300'
                 }`}>
                   {sport.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sección de Ligas */}
+          <div className="mt-8 mb-6">
+            <div className="flex items-center mb-4">
+              <span className="text-2xl mr-3">🏟️</span>
+              <h2 className="text-lg font-semibold">Ligas</h2>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-6">
+            {filteredLeagues.map((league) => (
+              <button
+                key={league.id}
+                onClick={() => setSelectedLeague(league.id)}
+                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                  selectedLeague === league.id
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <div className="flex items-center">
+                  <span className="mr-3 text-lg">{league.icon}</span>
+                  <div className="text-left">
+                    <div className="font-medium text-sm">{league.name}</div>
+                    <div className="text-xs text-gray-500">{league.country}</div>
+                  </div>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  selectedLeague === league.id
+                    ? 'bg-purple-800 text-purple-100'
+                    : 'bg-gray-700 text-gray-300'
+                }`}>
+                  {league.count}
                 </span>
               </button>
             ))}
@@ -978,7 +1149,9 @@ export default function Home() {
                 <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
                   {[
                     { key: 'retos', label: '🎯 Retos Activos', desc: 'Explora y participa en retos' },
-                    { key: 'crear', label: '➕ Crear Reto', desc: 'Crea un nuevo reto' }
+                    { key: 'crear', label: '➕ Crear Reto', desc: 'Crea un nuevo reto' },
+                    { key: 'torneos', label: '🏆 Torneos', desc: 'Torneos oficiales del admin' },
+                    { key: 'live', label: '⚽ En Vivo', desc: 'Resultados deportivos en tiempo real' }
                   ].map((tab) => (
                     <button
                       key={tab.key}
@@ -994,6 +1167,16 @@ export default function Home() {
                   ))}
                 </div>
                 <div className="flex space-x-3">
+                  {user && (
+                    <button 
+                      onClick={() => setShowBotManager(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center"
+                    >
+                      <span className="mr-2">🤖</span>
+                      Bots
+                    </button>
+                  )}
+                  <LoginButton variant="primary" size="md" />
                   <Link href="/sports">
                     <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center">
                       <span className="mr-2">🏆</span>
@@ -1007,19 +1190,37 @@ export default function Home() {
               <div className="mb-4">
                 <div>
                   <h2 className="text-xl font-semibold mb-1 flex items-center">
-                    {mainTab === 'retos' ? 'Retos Activos' : 'Crear Nuevo Reto'}
+                    {mainTab === 'retos' ? 'Retos Activos' : 
+                     mainTab === 'crear' ? 'Crear Nuevo Reto' :
+                     mainTab === 'torneos' ? 'Torneos Oficiales' : 
+                     mainTab === 'live' ? 'Deportes en Vivo' : 'Configurar Reto'}
                     {mainTab === 'retos' && selectedSport !== 'todos' && (
                       <span className="ml-3 px-3 py-1 bg-blue-600/20 text-blue-400 text-sm rounded-full border border-blue-600/30">
                         {dynamicSportsCategories.find(s => s.id === selectedSport)?.icon} {dynamicSportsCategories.find(s => s.id === selectedSport)?.name}
                       </span>
                     )}
+                    {mainTab === 'retos' && selectedLeague !== 'todas' && (
+                      <span className="ml-3 px-3 py-1 bg-purple-600/20 text-purple-400 text-sm rounded-full border border-purple-600/30">
+                        {filteredLeagues.find(l => l.id === selectedLeague)?.icon} {filteredLeagues.find(l => l.id === selectedLeague)?.name}
+                      </span>
+                    )}
                   </h2>
                   <p className="text-gray-400">
                     {mainTab === 'retos' 
-                      ? selectedSport === 'todos' 
+                      ? selectedSport === 'todos' && selectedLeague === 'todas'
                         ? 'Explora y participa en retos disponibles' 
-                        : `Retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name} - ${filteredChallenges.length} disponibles`
-                      : 'Elige el tipo de reto que quieres crear'}
+                        : selectedSport !== 'todos' && selectedLeague === 'todas'
+                          ? `Retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name} - ${filteredChallenges.length} disponibles`
+                          : selectedSport === 'todos' && selectedLeague !== 'todas'
+                            ? `Retos de ${filteredLeagues.find(l => l.id === selectedLeague)?.name} - ${filteredChallenges.length} disponibles`
+                            : `Retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name} en ${filteredLeagues.find(l => l.id === selectedLeague)?.name} - ${filteredChallenges.length} disponibles`
+                      : mainTab === 'crear' 
+                        ? 'Elige el tipo de reto que quieres crear'
+                        : mainTab === 'torneos'
+                          ? 'Competencias estructuradas con premios garantizados'
+                          : mainTab === 'live'
+                            ? 'Resultados deportivos en tiempo real de API-Football'
+                            : 'Configura los detalles de tu reto'}
                   </p>
                 </div>
               </div>
@@ -1029,29 +1230,137 @@ export default function Home() {
             {mainTab === 'retos' ? (
               <div className="space-y-4">
                 {filteredChallenges.length === 0 ? (
+                  /* Mensaje motivacional con ligas populares */
                   <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🎯</div>
-                    <h3 className="text-xl font-semibold text-white mb-2">
-                      {selectedSport === 'todos' ? 'No hay retos activos' : `No hay retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name}`}
-                    </h3>
-                    <p className="text-gray-400 mb-6">
-                      {selectedSport === 'todos' ? '¡Sé el primero en crear un reto emocionante!' : 'Prueba seleccionar otro deporte o crea un nuevo reto'}
-                    </p>
-                    <div className="flex gap-3 justify-center">
-                      {selectedSport !== 'todos' && (
+                    {/* Sección de Ligas Populares */}
+                    <div className="mb-8">
+                      <div className="text-6xl mb-4">🏆</div>
+                      <h3 className="text-2xl font-semibold text-white mb-2">Ligas y Competiciones Populares</h3>
+                      <p className="text-gray-400 mb-8">Encuentra eventos deportivos de las mejores ligas del mundo</p>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8">
+                        {/* La Liga */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">⚽</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">La Liga</h4>
+                            <p className="text-gray-400 text-xs mb-2">España</p>
+                            <p className="text-gray-500 text-xs">15 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* Premier League */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">⚽</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">Premier League</h4>
+                            <p className="text-gray-400 text-xs mb-2">Inglaterra</p>
+                            <p className="text-gray-500 text-xs">22 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* NBA */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">🏀</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">NBA</h4>
+                            <p className="text-gray-400 text-xs mb-2">Estados Unidos</p>
+                            <p className="text-gray-500 text-xs">18 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* Champions League */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-blue-800 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">🏆</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">Champions League</h4>
+                            <p className="text-gray-400 text-xs mb-2">UEFA</p>
+                            <p className="text-gray-500 text-xs">8 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* NFL */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-green-700 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">🏈</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">NFL</h4>
+                            <p className="text-gray-400 text-xs mb-2">Estados Unidos</p>
+                            <p className="text-gray-500 text-xs">12 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* Serie A */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">⚽</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">Serie A</h4>
+                            <p className="text-gray-400 text-xs mb-2">Italia</p>
+                            <p className="text-gray-500 text-xs">11 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* ATP Tour */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">🎾</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">ATP Tour</h4>
+                            <p className="text-gray-400 text-xs mb-2">Mundial</p>
+                            <p className="text-gray-500 text-xs">9 eventos</p>
+                          </div>
+                        </div>
+
+                        {/* Bundesliga */}
+                        <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors cursor-pointer">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-red-800 rounded-lg flex items-center justify-center mb-3">
+                              <span className="text-xl">⚽</span>
+                            </div>
+                            <h4 className="text-white font-medium text-sm mb-1">Bundesliga</h4>
+                            <p className="text-gray-400 text-xs mb-2">Alemania</p>
+                            <p className="text-gray-500 text-xs">13 eventos</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Call to action */}
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-2">
+                        {selectedSport === 'todos' ? '¡Crea tu primer reto!' : `¡Crea un reto de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name}!`}
+                      </h3>
+                      <p className="text-gray-400 mb-6">
+                        {selectedSport === 'todos' ? '¡Sé el primero en crear un reto emocionante con estos eventos populares!' : 'Explora las ligas populares arriba o crea un nuevo reto personalizado'}
+                      </p>
+                      <div className="flex gap-3 justify-center">
+                        {selectedSport !== 'todos' && (
+                          <button 
+                            onClick={() => setSelectedSport('todos')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                          >
+                            Ver Todos los Deportes
+                          </button>
+                        )}
                         <button 
-                          onClick={() => setSelectedSport('todos')}
-                          className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                          onClick={() => setMainTab('crear')}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                         >
-                          Ver Todos los Retos
+                          + Crear Reto
                         </button>
-                      )}
-                      <button 
-                        onClick={() => setMainTab('crear')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                      >
-                        + Crear Reto
-                      </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1099,7 +1408,7 @@ export default function Home() {
                           <div className="flex items-center space-x-8">
                             <div className="flex items-center">
                               <span className="text-green-400 mr-1">$</span>
-                              <span className="text-gray-400 mr-2">Apuesta</span>
+                              <span className="text-gray-400 mr-2">Reto</span>
                               <span className="text-white font-medium">{challenge.stake}</span>
                             </div>
                             <div className="flex items-center">
@@ -1130,6 +1439,150 @@ export default function Home() {
             ) : mainTab === 'crear' ? (
               /* Vista de crear reto */
               <CreateBetView onSelectBetType={handleCreateBetFromView} />
+            ) : mainTab === 'torneos' ? (
+              /* Vista de torneos oficiales */
+              <div className="space-y-6">
+                {/* Header de torneos */}
+                <div className="text-center mb-8">
+                  <div className="text-6xl mb-4">🏆</div>
+                  <h3 className="text-2xl font-semibold text-white mb-2">
+                    Torneos Oficiales
+                  </h3>
+                  <p className="text-gray-400 max-w-2xl mx-auto">
+                    Torneos estructurados creados y administrados por el equipo. Únete a competencias organizadas con premios garantizados.
+                  </p>
+                </div>
+
+                {/* Create Tournament Button */}
+                {user && (
+                  <div className="flex justify-center mb-6">
+                    <button 
+                      onClick={() => setShowCreateTournamentModal(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                    >
+                      <span>➕</span>
+                      <span>Crear Torneo</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Filtros de torneos */}
+                <div className="flex flex-wrap gap-3 mb-6">
+                  <button 
+                    onClick={() => setTournamentFilter('all')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      tournamentFilter === 'all' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    🏆 Todos
+                  </button>
+                  <button 
+                    onClick={() => setTournamentFilter('active')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      tournamentFilter === 'active' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    ⚡ Registro Abierto
+                  </button>
+                  <button 
+                    onClick={() => setTournamentFilter('upcoming')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      tournamentFilter === 'upcoming' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    📅 En Progreso
+                  </button>
+                  <button 
+                    onClick={() => setTournamentFilter('finished')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      tournamentFilter === 'finished' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                    }`}
+                  >
+                    ✅ Finalizados
+                  </button>
+                </div>
+
+                {/* Loading State */}
+                {loading && (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                    <p className="text-gray-400">Cargando torneos...</p>
+                  </div>
+                )}
+
+                {/* Tournament Grid */}
+                {!loading && getFilteredTournaments().length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getFilteredTournaments().map((tournament) => (
+                      <TournamentCard
+                        key={tournament.id}
+                        tournament={tournament}
+                        onJoin={handleJoinTournament}
+                        onViewDetails={handleViewTournamentDetails}
+                      />
+                    ))}
+                  </div>
+                ) : !loading && (
+                  /* Empty State */
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🏆</div>
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      {tournamentFilter === 'all' ? 'No hay torneos disponibles' :
+                       tournamentFilter === 'active' ? 'No hay torneos con registro abierto' :
+                       tournamentFilter === 'upcoming' ? 'No hay torneos en progreso' :
+                       'No hay torneos finalizados'}
+                    </h3>
+                    <p className="text-gray-400 mb-6">
+                      {tournamentFilter === 'all' ? 'Los torneos aparecerán aquí una vez creados.' :
+                       'Cambia el filtro para ver otros torneos.'}
+                    </p>
+                    {user && tournamentFilter === 'all' && (
+                      <button 
+                        onClick={() => setShowCreateTournamentModal(true)}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                      >
+                        ➕ Crear el primer torneo
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Info adicional */}
+                <div className="mt-12 bg-purple-900/20 border border-purple-600/30 rounded-xl p-6">
+                  <div className="flex items-start">
+                    <div className="w-12 h-12 bg-purple-600/20 rounded-lg flex items-center justify-center mr-4">
+                      <span className="text-xl">ℹ️</span>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-white mb-2">Sobre los Torneos</h4>
+                      <div className="text-gray-400 text-sm space-y-2">
+                        <p>• Crea torneos personalizados con diferentes formatos: Liga, Eliminación o Híbrido</p>
+                        <p>• Distribución de premios configurable: ganador único, top 3, top 5 o top 10%</p>
+                        <p>• Duraciones flexibles: rápido (3-7 días), medio (1-2 semanas), largo (3-4 semanas) o temporada (1-3 meses)</p>
+                        <p>• Resolución automatizada y transparente vía oráculos</p>
+                        <p>• Sistema de puntuación y clasificación en tiempo real</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : mainTab === 'live' ? (
+              /* Vista de deportes en vivo */
+              <div className="space-y-6">
+                <LiveScores 
+                  showHeader={true}
+                  maxItems={20}
+                  showRefresh={true}
+                />
+              </div>
             ) : (
               /* Vista de configuración */
               <div className="space-y-6">
@@ -1190,10 +1643,10 @@ export default function Home() {
                       />
                     </div>
 
-                    {/* Apuesta base */}
+                    {/* Reto base */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Apuesta Base (USDC) *
+                        Reto Base (USDC) *
                       </label>
                       <input
                         type="number"
@@ -1220,7 +1673,8 @@ export default function Home() {
                         onChange={handleConfigFormChange}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
                         min="2"
-                        max={selectedBetTypeCard?.id === 'group-balanced' ? '50' : '100'}
+                        max={selectedBetTypeCard?.id === 'group-balanced' ? '50' : 
+                             selectedBetTypeCard?.id === 'prediccion-simple' ? '10' : '100'}
                       />
                     </div>
 
@@ -1246,13 +1700,101 @@ export default function Home() {
                       </div>
                     )}
 
+                    {/* Campo específico para Predicción Simple - Aceptar ofertas variables */}
+                    {selectedBetTypeCard?.id === 'prediccion-simple' && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-300 mb-3">
+                          Tipo de Ofertas *
+                          <span className="text-xs text-gray-400 ml-2">¿Permites ofertas con diferentes cantidades?</span>
+                        </label>
+                        
+                        <div className="space-y-3">
+                          {/* Ofertas Variables */}
+                          <div 
+                            className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                              configFormData.acceptVariableOffers 
+                                ? 'border-blue-500 bg-blue-500/10' 
+                                : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
+                            }`}
+                            onClick={() => setConfigFormData({...configFormData, acceptVariableOffers: true})}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center mb-2">
+                                  <input
+                                    type="radio"
+                                    name="acceptVariableOffers"
+                                    value="true"
+                                    checked={configFormData.acceptVariableOffers === true}
+                                    onChange={() => setConfigFormData({...configFormData, acceptVariableOffers: true})}
+                                    className="mr-3 text-blue-500"
+                                  />
+                                  <span className="font-medium text-white">💰 Aceptar Ofertas Variables</span>
+                                  <span className="ml-2 text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded">
+                                    Flexible
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 mb-2">
+                                  Los aceptantes pueden apostar cantidades diferentes. Tú decides si aceptas cada oferta.
+                                </p>
+                                <div className="bg-gray-900/50 rounded p-2 text-xs text-gray-400 space-y-1">
+                                  <div><strong>Reglas importantes:</strong></div>
+                                  <div>• <strong>Límite de ganancia:</strong> Cada aceptante solo puede ganar máximo lo que apostó</div>
+                                  <div>• <strong>Control del creador:</strong> Tú decides si aceptar ofertas menores o mayores</div>
+                                  <div>• <strong>Cierre automático:</strong> Cuando las ofertas sumen igual a tu reto, el reto se cierra</div>
+                                  <div>• <strong>Ejemplo:</strong> Tu apuestas 50 USDC → cuando ofertas sumen 50 USDC, reto se activa</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Ofertas Iguales */}
+                          <div 
+                            className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                              !configFormData.acceptVariableOffers 
+                                ? 'border-green-500 bg-green-500/10' 
+                                : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
+                            }`}
+                            onClick={() => setConfigFormData({...configFormData, acceptVariableOffers: false})}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center mb-2">
+                                  <input
+                                    type="radio"
+                                    name="acceptVariableOffers"
+                                    value="false"
+                                    checked={configFormData.acceptVariableOffers === false}
+                                    onChange={() => setConfigFormData({...configFormData, acceptVariableOffers: false})}
+                                    className="mr-3 text-green-500"
+                                  />
+                                  <span className="font-medium text-white">⚖️ Solo Cantidades Iguales</span>
+                                  <span className="ml-2 text-xs bg-green-600/20 text-green-400 px-2 py-1 rounded">
+                                    Estricto
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 mb-2">
+                                  Solo pueden apostar exactamente la misma cantidad que tú apostaste
+                                </p>
+                                <div className="bg-gray-900/50 rounded p-2 text-xs text-gray-400">
+                                  <strong>Ejemplo:</strong> Si tu reto es 50 USDC, todos deben apostar exactamente 50 USDC
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Modo de resolución */}
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-300 mb-3">
                         Modo de Resolución * 
                         <span className="text-xs text-gray-400 ml-2">
                           {selectedBetTypeCard?.id === 'group-balanced' 
-                            ? 'Group Balanced usa siempre "Más Cercano"' 
+                            ? 'Group Balanced usa siempre "Grupo Ganador"'
+                            : selectedBetTypeCard?.id === 'prediccion-simple'
+                            ? 'Predicción Simple usa siempre "Exacta"'
                             : '¿Cómo se determina el ganador?'
                           }
                         </span>
@@ -1261,20 +1803,20 @@ export default function Home() {
                       {/* Modo específico para Group Balanced */}
                       {selectedBetTypeCard?.id === 'group-balanced' ? (
                         <div className="space-y-3">
-                          <div className="border-blue-500 bg-blue-500/10 border rounded-lg p-4">
+                          <div className="border-teal-500 bg-teal-500/10 border rounded-lg p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center mb-2">
                                   <input
                                     type="radio"
                                     name="resolutionMode"
-                                    value="CLOSEST"
+                                    value="GROUP_WINNER"
                                     checked={true}
                                     disabled={true}
-                                    className="mr-3 text-blue-500"
+                                    className="mr-3 text-teal-500"
                                   />
-                                  <span className="font-medium text-white">🔥 Más Cercano (Obligatorio)</span>
-                                  <span className="ml-2 text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded">
+                                  <span className="font-medium text-white">⚖️ Grupo Ganador (Obligatorio)</span>
+                                  <span className="ml-2 text-xs bg-teal-600/20 text-teal-400 px-2 py-1 rounded">
                                     Group Balanced
                                   </span>
                                 </div>
@@ -1286,10 +1828,51 @@ export default function Home() {
                                 </p>
                                 <div className="bg-gray-900/50 rounded p-3 text-xs">
                                   <div className="text-gray-400 mb-1">📝 Ejemplo:</div>
-                                  <div className="text-blue-300">• Grupo A: 8 predicciones correctas de 20 participantes</div>
-                                  <div className="text-blue-300">• Grupo B: 6 predicciones correctas de 20 participantes</div>
+                                  <div className="text-teal-300">• Grupo A: 8 predicciones correctas de 20 participantes</div>
+                                  <div className="text-teal-300">• Grupo B: 6 predicciones correctas de 20 participantes</div>
                                   <div className="text-green-300">• Ganador: Grupo A (todos sus 20 integrantes ganan)</div>
                                   <div className="text-yellow-300">• Premio: 95% del pozo dividido entre los 20 integrantes del Grupo A</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : selectedBetTypeCard?.id === 'prediccion-simple' ? (
+                        <div className="space-y-3">
+                          <div className="border-green-500 bg-green-500/10 border rounded-lg p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center mb-2">
+                                  <input
+                                    type="radio"
+                                    name="resolutionMode"
+                                    value="EXACT"
+                                    checked={true}
+                                    disabled={true}
+                                    className="mr-3 text-green-500"
+                                  />
+                                  <span className="font-medium text-white">🎯 Exacta (Obligatorio)</span>
+                                  <span className="ml-2 text-xs bg-green-600/20 text-green-400 px-2 py-1 rounded">
+                                    Predicción Simple
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 mb-3">
+                                  <strong>Reglas específicas de Predicción Simple:</strong><br/>
+                                  <strong>🎯 Para que gane el CREADOR:</strong> Debe pasar exactamente lo que predijo<br/>
+                                  <strong>❌ Para que ganen los ACEPTANTES:</strong> La predicción del creador debe fallar<br/>
+                                  <strong>⚠️ Si hay múltiples predicciones:</strong> Si el creador falla en UNA sola, pierde todo<br/>
+                                  <strong>💰 Límite de ganancias:</strong> Cada aceptante solo puede ganar máximo lo que apostó<br/>
+                                  <strong>✅ Control de ofertas:</strong> El creador decide qué ofertas acepta<br/>
+                                  <strong>🔒 Cierre automático:</strong> El reto se cierra cuando las ofertas igualan tu reto
+                                </p>
+                                <div className="bg-gray-900/50 rounded p-3 text-xs space-y-1">
+                                  <div className="text-gray-400 mb-1">📝 Ejemplo con ofertas variables:</div>
+                                  <div className="text-green-300">• Creador pone reto de 50 USDC y predice: "Barcelona gana 2-1"</div>
+                                  <div className="text-blue-300">• Aceptante 1 pone reto de 30 USDC (contra la predicción)</div>
+                                  <div className="text-blue-300">• Aceptante 2 pone reto de 20 USDC (contra la predicción)</div>
+                                  <div className="text-orange-300">• Total ofertas: 50 USDC → ¡Reto se cierra automáticamente!</div>
+                                  <div className="text-purple-300">Si resultado es exactamente 2-1: CREADOR gana 50 USDC</div>
+                                  <div className="text-red-300">Si resultado es otro: Aceptantes ganan máximo lo que pusieron en su reto</div>
                                 </div>
                               </div>
                             </div>
@@ -1412,104 +1995,6 @@ export default function Home() {
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {/* EXACT Mode */}
-                          <div 
-                            className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                              configFormData.resolutionMode === 'EXACT' 
-                                ? 'border-green-500 bg-green-500/10' 
-                                : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
-                            }`}
-                            onClick={() => setConfigFormData({...configFormData, resolutionMode: 'EXACT'})}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center mb-2">
-                                  <input
-                                    type="radio"
-                                    name="resolutionMode"
-                                    value="EXACT"
-                                    checked={configFormData.resolutionMode === 'EXACT'}
-                                    onChange={handleConfigFormChange}
-                                    className="mr-3 text-green-500"
-                                  />
-                                  <span className="font-medium text-white">🎯 Exacta</span>
-                                  <span className="ml-2 text-xs bg-green-600/20 text-green-400 px-2 py-1 rounded">
-                                    Mayor dificultad
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300">
-                                  Solo ganan los participantes que acierten exactamente el resultado final.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* CLOSEST Mode */}
-                          <div 
-                            className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                              configFormData.resolutionMode === 'CLOSEST' 
-                                ? 'border-blue-500 bg-blue-500/10' 
-                                : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
-                            }`}
-                            onClick={() => setConfigFormData({...configFormData, resolutionMode: 'CLOSEST'})}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center mb-2">
-                                  <input
-                                    type="radio"
-                                    name="resolutionMode"
-                                    value="CLOSEST"
-                                    checked={configFormData.resolutionMode === 'CLOSEST'}
-                                    onChange={handleConfigFormChange}
-                                    className="mr-3 text-blue-500"
-                                  />
-                                  <span className="font-medium text-white">🔥 Más Cercano</span>
-                                  <span className="ml-2 text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded">
-                                    Balanceado
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300">
-                                  Gana quien más se acerque al resultado real.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* MULTI_WINNER Mode */}
-                          <div 
-                            className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                              configFormData.resolutionMode === 'MULTI_WINNER' 
-                                ? 'border-purple-500 bg-purple-500/10' 
-                                : 'border-gray-600 bg-gray-800/50 hover:bg-gray-800'
-                            }`}
-                            onClick={() => setConfigFormData({...configFormData, resolutionMode: 'MULTI_WINNER'})}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center mb-2">
-                                  <input
-                                    type="radio"
-                                    name="resolutionMode"
-                                    value="MULTI_WINNER"
-                                    checked={configFormData.resolutionMode === 'MULTI_WINNER'}
-                                    onChange={handleConfigFormChange}
-                                    className="mr-3 text-purple-500"
-                                  />
-                                  <span className="font-medium text-white">🏆 Multi-Ganador</span>
-                                  <span className="ml-2 text-xs bg-purple-600/20 text-purple-400 px-2 py-1 rounded">
-                                    Más oportunidades
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300">
-                                  Múltiples participantes pueden ganar según criterios flexibles.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
                         </div>
                       )}
                     </div>
@@ -1532,9 +2017,9 @@ export default function Home() {
                         <div className="flex items-start">
                           <span className="text-blue-400 mr-3 mt-0.5">🕒</span>
                           <div>
-                            <h4 className="text-sm font-medium text-blue-100 mb-2">Cierre Automático de Apuestas</h4>
+                            <h4 className="text-sm font-medium text-blue-100 mb-2">Cierre Automático de Retos</h4>
                             <div className="text-sm text-blue-200 space-y-1">
-                              <p>• Las apuestas se cerrarán automáticamente cuando empiece el evento deportivo</p>
+                              <p>• Los retos se cerrarán automáticamente cuando empiece el evento deportivo</p>
                               <p>• Para múltiples juegos: se cierra cuando empiece el primer partido</p>
                               <p>• El sistema detecta automáticamente los horarios de inicio desde las APIs deportivas</p>
                               <p>• No es necesario configurar fecha/hora manualmente</p>
@@ -1546,8 +2031,8 @@ export default function Home() {
 
                     {/* Configuraciones específicas por modo de resolución */}
                     
-                    {/* Configuración EXACT Mode */}
-                    {configFormData.resolutionMode === 'EXACT' && (
+                    {/* Configuración EXACT Mode - NO mostrar para Predicción Simple */}
+                    {configFormData.resolutionMode === 'EXACT' && selectedBetTypeCard?.id !== 'prediccion-simple' && (
                       <div className="md:col-span-2 bg-green-900/20 border border-green-600/30 rounded-lg p-4">
                         <h4 className="text-green-300 font-medium mb-4 flex items-center">
                           <span className="mr-2">🎯</span>
@@ -1743,7 +2228,7 @@ export default function Home() {
                                 <p>• Si el cálculo da número impar, se redondea hacia arriba</p>
                                 <p>• Ejemplo: {configFormData.multiWinnerModeConfig.winnerPercentage}% de {configFormData.maxParticipants} = {Math.ceil((configFormData.multiWinnerModeConfig.winnerPercentage / 100) * parseInt(configFormData.maxParticipants))} ganadores</p>
                                 <p className="text-xs text-purple-400 bg-purple-900/30 p-2 rounded mt-2">
-                                  📝 Caso ejemplo: Si solo pueden ganar 2 personas y hay 3 apuestas iguales "2-1", ganan los primeros 2 que apostaron por "2-1"
+                                  📝 Caso ejemplo: Si solo pueden ganar 2 personas y hay 3 retos iguales "2-1", ganan los primeros 2 que pusieron el reto "2-1"
                                 </p>
                               </div>
                             </div>
@@ -1779,140 +2264,36 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Configuración específica para Desafío 1v1 */}
-                    {selectedBetTypeCard?.id === 'desafio-1v1' && (
-                      <div className="md:col-span-2 bg-red-900/20 border border-red-600/30 rounded-lg p-4">
-                        <h4 className="text-red-300 font-medium mb-4 flex items-center">
-                          <span className="mr-2">💥</span>
-                          Configuración Desafío 1v1
-                        </h4>
-                        
-                        <div className="bg-gray-800/50 rounded-lg p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-300 font-medium">Participantes:</span>
-                              <span className="text-red-400 font-semibold">Exactamente 2 jugadores</span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-300 font-medium">Tipo de duelo:</span>
-                              <span className="text-red-400 font-semibold">Clásico (directo)</span>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-300 font-medium">Premio:</span>
-                              <span className="text-red-400 font-semibold">Winner takes all</span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 p-3 bg-red-900/30 border border-red-600/40 rounded-lg">
-                            <div className="flex items-start">
-                              <span className="text-red-400 mr-2 mt-0.5">ℹ️</span>
-                              <div className="text-sm text-red-200">
-                                <p className="font-medium mb-1">Reglas del Duelo 1v1:</p>
-                                <ul className="space-y-1 text-red-300">
-                                  <li>• Solo 2 participantes pueden unirse</li>
-                                  <li>• Duelo directo con apuestas igualadas</li>
-                                  <li>• El ganador se lleva el 100% del pozo</li>
-                                  <li>• Resolución automática cuando se completa</li>
-                                </ul>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Configuración específica para Group Balanced */}
-                    {selectedBetTypeCard?.id === 'group-balanced' && (
-                      <div className="md:col-span-2 bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
-                        <h4 className="text-blue-300 font-medium mb-4 flex items-center">
-                          <span className="mr-2">⚖️</span>
-                          Configuración Group Balanced
-                        </h4>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Método de Balanceo *
-                            </label>
-                            <select
-                              name="groupBalancedMethod"
-                              defaultValue="SKILL_BASED"
-                              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                            >
-                              <option value="SKILL_BASED">Basado en Habilidad</option>
-                              <option value="RANDOM">Aleatorio</option>
-                              <option value="STAKES_BASED">Basado en Apuestas</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                              Tamaño de Grupos
-                            </label>
-                            <select
-                              name="groupSize"
-                              defaultValue="10"
-                              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                            >
-                              <option value="5">5 por grupo</option>
-                              <option value="10">10 por grupo (Recomendado)</option>
-                              <option value="20">20 por grupo</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="bg-gray-800/50 rounded-lg p-4">
-                          <div className="text-sm font-medium text-blue-200 mb-3">Información del Sistema</div>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Máximo participantes totales:</span>
-                              <span className="text-white">{parseInt(configFormData.maxGroups) * parseInt(configFormData.maxParticipants)} ({configFormData.maxGroups} grupos de {configFormData.maxParticipants})</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Auto-balanceado:</span>
-                              <span className="text-green-400">✅ Activado</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Ranking interno:</span>
-                              <span className="text-blue-400">Por grupo</span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 p-3 bg-blue-900/30 border border-blue-600/40 rounded-lg">
-                            <div className="text-xs text-blue-300">
-                              <p><strong>Cómo funciona:</strong></p>
-                              <p>• Los participantes se dividen automáticamente en grupos equilibrados</p>
-                              <p>• Cada grupo compite internamente</p>
-                              <p>• Los ganadores de cada grupo obtienen premios</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Configuración específica para Torneo Estructurado */}
                     {selectedBetTypeCard?.id === 'torneo-estructurado' && (
-                      <div className="md:col-span-2 bg-purple-900/20 border border-purple-600/30 rounded-lg p-4">
-                        <h4 className="text-purple-300 font-medium mb-4 flex items-center">
+                      <div className="md:col-span-2 bg-purple-900/20 border border-purple-600/30 rounded-lg p-6">
+                        <h4 className="text-purple-300 font-medium mb-6 flex items-center">
                           <span className="mr-2">🏆</span>
                           Configuración Torneo Estructurado
                         </h4>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                           <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">
                               Tipo de Torneo *
                             </label>
                             <select
                               name="tournamentType"
-                              defaultValue="LEAGUE"
+                              value={configFormData.tournamentType || "LEAGUE"}
+                              onChange={handleConfigFormChange}
                               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                             >
-                              <option value="LEAGUE">Liga (Todos contra todos)</option>
-                              <option value="KNOCKOUT">Eliminación Directa</option>
+                              <option value="LEAGUE">🏁 Liga (Todos vs Todos)</option>
+                              <option value="KNOCKOUT">⚔️ Eliminación Directa</option>
+                              <option value="HYBRID">🔄 Híbrido (Liga + Playoffs)</option>
                             </select>
+                            <div className="mt-1 text-xs text-gray-400">
+                              {configFormData.tournamentType === 'LEAGUE' && 'Sistema de puntos, todos compiten contra todos'}
+                              {configFormData.tournamentType === 'KNOCKOUT' && 'Eliminación directa por rondas'}
+                              {configFormData.tournamentType === 'HYBRID' && 'Liga clasificatoria + playoffs eliminatorios'}
+                            </div>
                           </div>
 
                           <div>
@@ -1921,56 +2302,183 @@ export default function Home() {
                             </label>
                             <select
                               name="tournamentParticipants"
-                              defaultValue="16"
+                              value={configFormData.tournamentParticipants || "16"}
+                              onChange={handleConfigFormChange}
                               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                             >
                               <option value="8">8 participantes</option>
-                              <option value="16">16 participantes</option>
+                              <option value="16">16 participantes ⭐</option>
                               <option value="32">32 participantes</option>
                               <option value="64">64 participantes</option>
-                              <option value="100">100 participantes</option>
+                              <option value="100">100 participantes (máx)</option>
                             </select>
                           </div>
                         </div>
 
-                        <div className="mb-4">
-                          <label className="flex items-center text-sm font-medium text-gray-300">
-                            <input
-                              type="checkbox"
-                              name="allowIdenticalPredictions"
-                              defaultChecked={false}
-                              className="mr-2 accent-purple-500"
-                            />
-                            Permitir Predicciones Idénticas
-                          </label>
-                          <div className="mt-1 text-xs text-gray-400">
-                            Permite que múltiples participantes hagan la misma predicción
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Distribución de Premios
+                            </label>
+                            <select
+                              name="tournamentPrizeDistribution"
+                              value={configFormData.tournamentPrizeDistribution || "TOP3"}
+                              onChange={handleConfigFormChange}
+                              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                            >
+                              <option value="WINNER_TAKES_ALL">🥇 Ganador único (100%)</option>
+                              <option value="TOP3">🏆 Top 3 (60%, 25%, 15%)</option>
+                              <option value="TOP5">🎖️ Top 5 (40%, 25%, 15%, 12%, 8%)</option>
+                              <option value="TOP10">🌟 Top 10% de participantes</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                              Duración del Torneo
+                            </label>
+                            <select
+                              name="tournamentDuration"
+                              value={configFormData.tournamentDuration || "MEDIUM"}
+                              onChange={handleConfigFormChange}
+                              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                            >
+                              <option value="FAST">⚡ Rápido (3-7 días)</option>
+                              <option value="MEDIUM">🕐 Normal (1-2 semanas)</option>
+                              <option value="LONG">📅 Extendido (3-4 semanas)</option>
+                              <option value="SEASON">🏆 Temporada (1-3 meses)</option>
+                            </select>
                           </div>
                         </div>
 
-                        <div className="bg-gray-800/50 rounded-lg p-4">
-                          <div className="text-sm font-medium text-purple-200 mb-3">Características del Torneo</div>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Estructura:</span>
-                              <span className="text-purple-400">Sistema de brackets</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                              <input
+                                type="checkbox"
+                                name="allowTournamentSpectators"
+                                checked={configFormData.allowTournamentSpectators || false}
+                                onChange={handleConfigFormChange}
+                                className="mr-2 accent-purple-500"
+                              />
+                              👥 Permitir Espectadores
+                            </label>
+                            <div className="mt-1 text-xs text-gray-400">
+                              Los espectadores pueden seguir el torneo sin apostar
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Duración:</span>
-                              <span className="text-white">Hasta finalización</span>
+                          </div>
+
+                          <div>
+                            <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                              <input
+                                type="checkbox"
+                                name="enableTournamentChat"
+                                checked={configFormData.enableTournamentChat || true}
+                                onChange={handleConfigFormChange}
+                                className="mr-2 accent-purple-500"
+                              />
+                              💬 Chat del Torneo
+                            </label>
+                            <div className="mt-1 text-xs text-gray-400">
+                              Chat en vivo entre participantes durante el torneo
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Registro:</span>
-                              <span className="text-green-400">Automático al unirse</span>
+                          </div>
+                        </div>
+
+                        <div className="mb-6">
+                          <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                            <input
+                              type="checkbox"
+                              name="allowIdenticalPredictions"
+                              checked={configFormData.allowIdenticalPredictions || false}
+                              onChange={handleConfigFormChange}
+                              className="mr-2 accent-purple-500"
+                            />
+                            🎯 Permitir Predicciones Idénticas
+                          </label>
+                          <div className="mt-1 text-xs text-gray-400">
+                            Si se permite, múltiples participantes pueden hacer la misma predicción. 
+                            Si está deshabilitado, cada predicción debe ser única.
+                          </div>
+                        </div>
+
+                        <div className="bg-gray-800/50 rounded-lg p-5">
+                          <div className="text-sm font-medium text-purple-200 mb-4 flex items-center">
+                            <span className="mr-2">⚙️</span>
+                            Configuración Avanzada del Torneo
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Tipo:</span>
+                                <span className="text-purple-400 font-medium">
+                                  {configFormData.tournamentType === 'LEAGUE' ? '🏁 Liga' :
+                                   configFormData.tournamentType === 'KNOCKOUT' ? '⚔️ Eliminación' : '🔄 Híbrido'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Participantes:</span>
+                                <span className="text-white font-medium">{configFormData.tournamentParticipants || '16'} jugadores</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Duración:</span>
+                                <span className="text-orange-400 font-medium">
+                                  {configFormData.tournamentDuration === 'FAST' ? '⚡ 3-7 días' :
+                                   configFormData.tournamentDuration === 'MEDIUM' ? '🕐 1-2 semanas' :
+                                   configFormData.tournamentDuration === 'LONG' ? '📅 3-4 semanas' : '🏆 1-3 meses'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Premios:</span>
+                                <span className="text-yellow-400 font-medium">
+                                  {configFormData.tournamentPrizeDistribution === 'WINNER_TAKES_ALL' ? '🥇 1 ganador' :
+                                   configFormData.tournamentPrizeDistribution === 'TOP3' ? '🏆 Top 3' :
+                                   configFormData.tournamentPrizeDistribution === 'TOP5' ? '🎖️ Top 5' : '🌟 Top 10%'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Espectadores:</span>
+                                <span className={`font-medium ${configFormData.allowTournamentSpectators ? 'text-green-400' : 'text-gray-400'}`}>
+                                  {configFormData.allowTournamentSpectators ? '✅ Permitidos' : '❌ No permitidos'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Chat:</span>
+                                <span className={`font-medium ${configFormData.enableTournamentChat ? 'text-green-400' : 'text-gray-400'}`}>
+                                  {configFormData.enableTournamentChat ? '💬 Habilitado' : '🔇 Deshabilitado'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           
-                          <div className="mt-4 p-3 bg-purple-900/30 border border-purple-600/40 rounded-lg">
+                          <div className="mt-4 p-4 bg-purple-900/30 border border-purple-600/40 rounded-lg">
                             <div className="text-xs text-purple-300">
-                              <p><strong>Sistema de Torneo:</strong></p>
-                              <p>• Liga: Todos compiten entre sí, ranking por puntos</p>
-                              <p>• Knockout: Eliminación directa por rondas</p>
-                              <p>• Múltiples ganadores según configuración</p>
+                              <p className="font-semibold mb-2">🏆 Mecánica del Torneo:</p>
+                              {configFormData.tournamentType === 'LEAGUE' && (
+                                <div className="space-y-1">
+                                  <p>• Todos los participantes compiten entre sí</p>
+                                  <p>• Sistema de ranking por puntos acumulados</p>
+                                  <p>• Ganadores según distribución seleccionada</p>
+                                </div>
+                              )}
+                              {configFormData.tournamentType === 'KNOCKOUT' && (
+                                <div className="space-y-1">
+                                  <p>• Brackets de eliminación directa</p>
+                                  <p>• Perdedores quedan eliminados del torneo</p>
+                                  <p>• Finalistas compiten por el primer lugar</p>
+                                </div>
+                              )}
+                              {configFormData.tournamentType === 'HYBRID' && (
+                                <div className="space-y-1">
+                                  <p>• Fase de liga clasificatoria</p>
+                                  <p>• Top clasificados avanzan a playoffs</p>
+                                  <p>• Eliminación directa en fase final</p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1993,13 +2501,80 @@ export default function Home() {
                         <span className="text-white">Hasta {configFormData.maxParticipants}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Apuesta:</span>
+                        <span className="text-gray-400">Reto:</span>
                         <span className="text-white">${configFormData.betAmount} USDC cada uno</span>
                       </div>
+                      {/* Mostrar tipo de ofertas para Predicción Simple */}
+                      {selectedBetTypeCard?.id === 'prediccion-simple' && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Tipo de ofertas:</span>
+                          <div className="text-right">
+                            <span className={`font-medium ${configFormData.acceptVariableOffers ? 'text-blue-400' : 'text-green-400'}`}>
+                              {configFormData.acceptVariableOffers ? '💰 Variables' : '⚖️ Iguales'}
+                            </span>
+                            <div className="text-xs text-gray-400">
+                              {configFormData.acceptVariableOffers 
+                                ? 'Cantidades diferentes permitidas' 
+                                : 'Solo cantidades exactas'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Mostrar configuración específica para Torneo */}
+                      {selectedBetTypeCard?.id === 'torneo-estructurado' && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Tipo de torneo:</span>
+                            <span className="text-purple-400 font-medium">
+                              {configFormData.tournamentType === 'LEAGUE' ? '🏁 Liga' :
+                               configFormData.tournamentType === 'KNOCKOUT' ? '⚔️ Eliminación' : '🔄 Híbrido'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Participantes torneo:</span>
+                            <span className="text-white">{configFormData.tournamentParticipants} jugadores</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Distribución premios:</span>
+                            <span className="text-yellow-400 font-medium">
+                              {configFormData.tournamentPrizeDistribution === 'WINNER_TAKES_ALL' ? '🥇 1 ganador' :
+                               configFormData.tournamentPrizeDistribution === 'TOP3' ? '🏆 Top 3' :
+                               configFormData.tournamentPrizeDistribution === 'TOP5' ? '🎖️ Top 5' : '🌟 Top 10%'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Duración:</span>
+                            <span className="text-orange-400">
+                              {configFormData.tournamentDuration === 'FAST' ? '⚡ 3-7 días' :
+                               configFormData.tournamentDuration === 'MEDIUM' ? '🕐 1-2 semanas' :
+                               configFormData.tournamentDuration === 'LONG' ? '📅 3-4 semanas' : '🏆 1-3 meses'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Funciones extra:</span>
+                            <div className="text-right">
+                              <div className="space-x-2">
+                                {configFormData.allowTournamentSpectators && (
+                                  <span className="text-xs bg-green-600/20 text-green-400 px-2 py-1 rounded">👥 Espectadores</span>
+                                )}
+                                {configFormData.enableTournamentChat && (
+                                  <span className="text-xs bg-blue-600/20 text-blue-400 px-2 py-1 rounded">💬 Chat</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-400">Premio total estimado:</span>
                         <span className="text-yellow-400">
-                          ${(parseFloat(configFormData.betAmount) * parseInt(configFormData.maxParticipants)).toLocaleString()} USDC
+                          ${(parseFloat(configFormData.betAmount) * parseInt(
+                            selectedBetTypeCard?.id === 'torneo-estructurado' 
+                              ? configFormData.tournamentParticipants 
+                              : configFormData.maxParticipants
+                          )).toLocaleString()} USDC
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -2007,11 +2582,13 @@ export default function Home() {
                         <div className="text-right">
                           <div className="text-white font-medium mb-1">
                             {configFormData.resolutionMode === 'EXACT' ? '🎯 Exacta' :
-                             configFormData.resolutionMode === 'CLOSEST' ? '🔥 Más Cercano' : '🏆 Multi-Ganador'}
+                             configFormData.resolutionMode === 'CLOSEST' ? '🔥 Más Cercano' :
+                             configFormData.resolutionMode === 'GROUP_WINNER' ? '⚖️ Grupo Ganador' : '🏆 Multi-Ganador'}
                           </div>
                           <div className="text-xs text-gray-400">
                             {configFormData.resolutionMode === 'EXACT' ? 'Solo coincidencias perfectas ganan' :
-                             configFormData.resolutionMode === 'CLOSEST' ? 'Gana la predicción más cercana' : 'Múltiples ganadores posibles'}
+                             configFormData.resolutionMode === 'CLOSEST' ? 'Gana la predicción más cercana' :
+                             configFormData.resolutionMode === 'GROUP_WINNER' ? 'Todo el grupo ganador recibe premio' : 'Múltiples ganadores posibles'}
                           </div>
                         </div>
                       </div>
@@ -2146,10 +2723,19 @@ export default function Home() {
         </div>
 
         {/* Panel de Usuario */}
-        <UserPanel username={mockUser.username} />
+        <div className="w-80 bg-[#1a1d29] border-l border-gray-700 flex flex-col">
+          <UserPanel username={mockUser.username} />
+          
+          {/* Bot Simulator - Solo mostrar si hay usuario autenticado */}
+          {user && challenges.length > 0 && (
+            <div className="p-4 border-t border-gray-700">
+              <BotSimulator autoSimulate={false} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Modal para unirse a apuesta */}
+      {/* Modal para unirse a reto */}
       {showJoinModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[#2a2d47] rounded-xl p-6 max-w-md w-full mx-4 border border-gray-600">
@@ -2223,14 +2809,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* Selector de tipo de apuesta */}
+      {/* Selector de tipo de reto */}
       <BetTypeSelector 
         isOpen={showBetTypeSelector}
         onClose={() => setShowBetTypeSelector(false)}
         onSelectType={handleBetTypeSelection}
       />
 
-      {/* Modal para crear apuesta */}
+      {/* Modal para crear reto */}
       <BetModal 
         isOpen={showCreateModal}
         onClose={() => {
@@ -2238,7 +2824,7 @@ export default function Home() {
           setSelectedBetType(null);
         }}
         onCreateBet={handleCreateBet}
-        selectedType={selectedBetType}
+        selectedType={selectedBetType || undefined}
       />
 
       {/* Modales comentados - ahora usan el flujo unificado 
@@ -2285,85 +2871,20 @@ export default function Home() {
         />
       )}
 
-      {/* Pie de página completo */}
-      <footer className="w-full bg-[#0f1116] border-t border-gray-700">
-        <div className="px-6 py-6">
-          <div className="flex items-center justify-between">
-            {/* Lado izquierdo - Logo y descripción */}
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white font-bold">P</span>
-                </div>
-                <div>
-                  <span className="text-xl font-bold text-white">77paladio</span>
-                  <p className="text-sm text-gray-400">Plataforma descentralizada de apuestas deportivas</p>
-                </div>
-              </div>
-              
-              {/* Estadísticas del protocolo */}
-              <div className="hidden md:flex items-center space-x-8 text-sm">
-                <div>
-                  <span className="text-gray-400">Total Deportes:</span>
-                  <span className="ml-2 text-white font-medium">{dynamicSportsCategories.filter(s => s.count > 0).length - 1}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Retos Activos:</span>
-                  <span className="ml-2 text-white font-medium">{activeChallenges.length}</span>
-                </div>
-              </div>
-            </div>
+      {/* Bot Manager Modal */}
+      <BotManager 
+        isOpen={showBotManager}
+        onClose={() => setShowBotManager(false)}
+      />
 
-            {/* Lado derecho - Redes sociales y copyright */}
-            <div className="flex items-center space-x-8">
-              {/* Redes sociales */}
-              <div className="flex items-center space-x-3">
-                <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors" title="Twitter">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-                  </svg>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors" title="LinkedIn">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                  </svg>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors" title="GitHub">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                </a>
-                <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors" title="Discord">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418Z"/>
-                  </svg>
-                </a>
-              </div>
+      {/* Create Tournament Modal */}
+      <CreateTournamentModal 
+        isOpen={showCreateTournamentModal}
+        onClose={() => setShowCreateTournamentModal(false)}
+        onSuccess={handleCreateTournamentSuccess}
+      />
 
-              {/* Copyright y badges */}
-              <div className="text-right">
-                <div className="text-sm text-gray-400 mb-1">
-                  © 2024 77paladio
-                </div>
-                <div className="flex items-center space-x-3 text-xs">
-                  <span className="text-yellow-400">⚠️ Solo Testnet</span>
-                  <span className="text-gray-500">•</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-green-400">🔒</span>
-                    <span className="text-gray-400">Seguro</span>
-                    <span className="text-gray-500">•</span>
-                    <span className="text-purple-400">⚡</span>
-                    <span className="text-gray-400">Polygon</span>
-                    <span className="text-gray-500">•</span>
-                    <span className="text-blue-400">💎</span>
-                    <span className="text-gray-400">DeFi</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

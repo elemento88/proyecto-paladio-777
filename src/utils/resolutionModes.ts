@@ -5,7 +5,7 @@ export const RESOLUTION_MODES: Record<ResolutionMode, ResolutionModeInfo> = {
     name: 'Exacta',
     icon: '🎯',
     description: 'Solo ganan los participantes que acierten exactamente el resultado final. Si nadie acierta, se regresan las criptomonedas a todos los participantes',
-    example: 'Si el resultado es "Barcelona 2-1 Real Madrid", solo ganan quienes predijeron exactamente "2-1". Si nadie predijo 2-1, todos recuperan su apuesta',
+    example: 'Si el resultado es "Barcelona 2-1 Real Madrid", solo ganan quienes predijeron exactamente "2-1". Si nadie predijo 2-1, todos recuperan su reto',
     difficulty: 'Difícil',
     winChance: 'Baja',
     prizeDistribution: 'Los ganadores se dividen el 95% del pozo total. Sin ganadores: reembolso completo'
@@ -27,6 +27,15 @@ export const RESOLUTION_MODES: Record<ResolutionMode, ResolutionModeInfo> = {
     difficulty: 'Fácil',
     winChance: 'Alta',
     prizeDistribution: 'Se divide entre ganadores (ej: 1° 60%, 2° 25%, 3° 15%)'
+  },
+  [ResolutionMode.GROUP_WINNER]: {
+    name: 'Grupo Ganador',
+    icon: '⚖️',
+    description: 'El grupo con más predicciones acertadas gana. Las ganancias se distribuyen entre todos los integrantes del grupo ganador',
+    example: 'Grupo A: 8 aciertos de 20 participantes, Grupo B: 6 aciertos de 20 participantes. Todos los integrantes del Grupo A ganan',
+    difficulty: 'Medio',
+    winChance: 'Media-Alta',
+    prizeDistribution: 'El 95% del pozo se divide equitativamente entre todos los integrantes del grupo ganador'
   }
 };
 
@@ -85,6 +94,14 @@ export function calculatePrizeDistribution(
         amount: (netPrize * dist.percentage) / 100
       }));
 
+    case ResolutionMode.GROUP_WINNER:
+      // En modo grupo ganador, todos los integrantes del grupo ganador se dividen el premio equitativamente
+      return [{
+        position: 1,
+        percentage: 95,
+        amount: netPrize / Math.max(1, estimatedWinners)
+      }];
+
     default:
       return [];
   }
@@ -103,11 +120,13 @@ export function allowsRefunds(mode: ResolutionMode): boolean {
 export function getRefundText(mode: ResolutionMode): string {
   switch (mode) {
     case ResolutionMode.EXACT:
-      return 'Si nadie acierta exactamente, se devuelve el 100% de las apuestas sin fees';
+      return 'Si nadie acierta exactamente, se devuelve el 100% de los retos sin fees';
     case ResolutionMode.CLOSEST:
       return 'Siempre hay ganador: quien esté más cerca del resultado';
     case ResolutionMode.MULTI_WINNER:
       return 'Múltiples criterios de victoria: mayor probabilidad de ganar';
+    case ResolutionMode.GROUP_WINNER:
+      return 'Competencia por grupos: todos los integrantes del grupo con más aciertos ganan';
     default:
       return '';
   }
@@ -141,6 +160,14 @@ export function getResolutionModeTheme(mode: ResolutionMode) {
         border: 'border-purple-500',
         text: 'text-purple-400',
         badge: 'bg-purple-600/20'
+      };
+    case ResolutionMode.GROUP_WINNER:
+      return {
+        color: 'teal',
+        bg: 'bg-teal-500/10',
+        border: 'border-teal-500',
+        text: 'text-teal-400',
+        badge: 'bg-teal-600/20'
       };
     default:
       return {

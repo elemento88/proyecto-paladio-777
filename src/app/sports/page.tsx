@@ -1,7 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import HomeButton from '@/components/HomeButton';
+import Footer from '@/components/Footer';
+import { useSports } from '@/hooks/useSports';
+import { LiveScore } from '@/types/sports';
 
 interface SportCategory {
   id: string;
@@ -435,9 +440,119 @@ const upcomingGames: UpcomingGame[] = [
 ];
 
 export default function SportsPage() {
+  const searchParams = useSearchParams();
   const [showMoreSports, setShowMoreSports] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Hook para obtener datos deportivos reales de TheSportsDB
+  const { 
+    sports: availableSports,
+    todaysFixtures, 
+    loading, 
+    error,
+    fetchTodaysFixtures 
+  } = useSports();
+  
+  // Obtener parámetros de URL para filtrado por deporte
+  const sportFilter = searchParams.get('sport');
+  const gameCount = searchParams.get('gameCount') ? parseInt(searchParams.get('gameCount')!) : 1;
+
+  // Cargar eventos al montar el componente
+  useEffect(() => {
+    fetchTodaysFixtures();
+  }, [fetchTodaysFixtures]);
+
+  // Convertir datos de API a formato de juego para mostrar con manejo de errores
+  const convertApiDataToGame = (liveScore: LiveScore): UpcomingGame => {
+    // Validaciones de seguridad
+    if (!liveScore || !liveScore.homeTeam || !liveScore.awayTeam) {
+      throw new Error('Datos de evento incompletos');
+    }
+
+    const sportColors = {
+      'soccer': { color: 'text-green-400', bgColor: 'from-green-900/20 to-green-800/10' },
+      'basketball': { color: 'text-orange-400', bgColor: 'from-orange-900/20 to-orange-800/10' },
+      'american football': { color: 'text-purple-400', bgColor: 'from-purple-900/20 to-purple-800/10' },
+      'ice hockey': { color: 'text-blue-400', bgColor: 'from-blue-900/20 to-blue-800/10' },
+      'baseball': { color: 'text-red-400', bgColor: 'from-red-900/20 to-red-800/10' },
+      'tennis': { color: 'text-yellow-400', bgColor: 'from-yellow-900/20 to-yellow-800/10' },
+    } as const;
+
+    const sport = (liveScore.sport || 'soccer').toLowerCase();
+    const sportInfo = sportColors[sport as keyof typeof sportColors] || 
+                     { color: 'text-gray-400', bgColor: 'from-gray-900/20 to-gray-800/10' };
+
+    const sportIcons = {
+      'soccer': '⚽',
+      'basketball': '🏀', 
+      'american football': '🏈',
+      'ice hockey': '🏒',
+      'baseball': '⚾',
+      'tennis': '🎾',
+    } as const;
+
+    let eventDate: Date;
+    let minutesToStart = 0;
+    
+    try {
+      eventDate = new Date(liveScore.date || new Date());
+      const now = new Date();
+      minutesToStart = Math.max(0, Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60)));
+    } catch (error) {
+      eventDate = new Date();
+      console.warn('Error parsing date:', error);
+    }
+    
+    const sportName = sport === 'soccer' ? 'Fútbol' : 
+                     sport === 'basketball' ? 'Baloncesto' :
+                     sport === 'american football' ? 'Fútbol Americano' :
+                     sport === 'ice hockey' ? 'Hockey' :
+                     sport === 'baseball' ? 'Béisbol' :
+                     sport === 'tennis' ? 'Tenis' : 
+                     sport.charAt(0).toUpperCase() + sport.slice(1);
+    
+    return {
+      id: (liveScore.id || Math.random()).toString(),
+      sport: sportName,
+      sportIcon: sportIcons[sport as keyof typeof sportIcons] || '🏆',
+      league: liveScore.league || 'Liga',
+      homeTeam: liveScore.homeTeam || 'Equipo Local',
+      awayTeam: liveScore.awayTeam || 'Equipo Visitante',
+      homeTeamLogo: '🏠',
+      awayTeamLogo: '🚗',
+      date: eventDate.toISOString().split('T')[0],
+      time: liveScore.time || 'TBD',
+      venue: 'Stadium',
+      status: (liveScore.status === 'Match Finished' || liveScore.status?.includes('Finished')) ? 'upcoming' : 
+              (liveScore.status?.includes('Half') || liveScore.status?.includes('Live')) ? 'live' :
+              minutesToStart < 120 ? 'soon' : 'upcoming',
+      minutesToStart,
+      odds: {
+        home: '2.10',
+        draw: sport === 'soccer' ? '3.20' : undefined,
+        away: '1.85'
+      },
+      totalBets: Math.floor(Math.random() * 500) + 100,
+      volume: `$${(Math.random() * 100 + 20).toFixed(1)}K`,
+      ...sportInfo
+    };
+  };
+
+  // Combinar eventos reales de API con algunos datos mock con manejo de errores
+  const realGames = todaysFixtures
+    ?.filter(fixture => fixture && fixture.homeTeam && fixture.awayTeam)
+    ?.map(fixture => {
+      try {
+        return convertApiDataToGame(fixture);
+      } catch (error) {
+        console.warn('Error converting API data:', error);
+        return null;
+      }
+    })
+    ?.filter(Boolean) || [];
+    
+  const allGames = realGames.length > 0 ? realGames : upcomingGames;
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -452,18 +567,44 @@ export default function SportsPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Filtrar deportes basado en búsqueda
+  const filteredSports = sportsCategories.filter(sport =>
+    sport.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filtrar juegos basado en deporte seleccionado
+  const filteredGames = sportFilter && allGames ? 
+    allGames.filter(game => game?.sport?.toLowerCase() === sportFilter.toLowerCase()) : 
+    allGames || [];
+
   return (
     <div className="min-h-screen bg-[#1a1d29] text-white p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className="text-gray-400 hover:text-white flex items-center mb-4">
-            ← Volver al inicio
-          </Link>
+          <div className="flex items-center space-x-4 mb-4">
+            <HomeButton />
+            <Link href="/" className="text-gray-400 hover:text-white flex items-center">
+              ← Volver al inicio
+            </Link>
+          </div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Deportes</h1>
-              <p className="text-gray-400">Selecciona una categoría deportiva para ver próximos juegos y crear apuestas</p>
+              <div className="flex items-center space-x-4 mb-2">
+                <h1 className="text-4xl font-bold text-white">Deportes</h1>
+                {gameCount > 1 && (
+                  <span className="bg-green-600/20 text-green-400 px-3 py-1 rounded-lg text-sm">
+                    Añadiendo Partido {gameCount} de 15
+                  </span>
+                )}
+                {sportFilter && (
+                  <span className="bg-blue-600/20 text-blue-400 px-3 py-1 rounded-lg text-sm">
+                    Filtrado: {sportFilter}
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-400">Selecciona una categoría deportiva para ver próximos juegos y crear retos</p>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-400">Deportes Disponibles</div>
@@ -503,8 +644,8 @@ export default function SportsPage() {
 
             {/* Botones de deportes - Derecha */}
             <div className="flex space-x-3 overflow-x-visible pb-4 min-w-fit">
-              {sportsCategories.map((sport) => (
-                <Link key={sport.id} href={`/sports/${sport.id}/games`}>
+              {filteredSports.map((sport) => (
+                <Link key={sport.id} href={`/sports/${sport.id}/games${gameCount > 1 ? `?gameCount=${gameCount}` : ''}`}>
                   <div className="flex-shrink-0 group cursor-pointer">
                     <div className={`w-16 h-16 bg-gradient-to-br ${sport.bgColor} border border-gray-600 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-all duration-200 group-hover:border-gray-400`}>
                       {sport.logo}
@@ -545,7 +686,7 @@ export default function SportsPage() {
                     
                     <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
                       {additionalSports.map((sport) => (
-                        <Link key={sport.id} href={`/sports/${sport.id}/games`} onClick={() => setShowMoreSports(false)}>
+                        <Link key={sport.id} href={`/sports/${sport.id}/games${gameCount > 1 ? `?gameCount=${gameCount}` : ''}`} onClick={() => setShowMoreSports(false)}>
                           <div className={`bg-gradient-to-br ${sport.bgColor} border border-gray-600 rounded-lg p-3 hover:border-gray-500 transition-all cursor-pointer group hover:scale-105`}>
                             <div className="flex items-center space-x-2 mb-2">
                               <div className={`w-8 h-8 bg-[#1a1d29] rounded-lg flex items-center justify-center text-sm ${sport.color}`}>
@@ -590,9 +731,49 @@ export default function SportsPage() {
 
         {/* Grid de juegos próximos */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">🔥 Próximos Eventos</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {upcomingGames.map((game) => (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">🔥 Próximos Eventos</h2>
+            <div className="flex items-center space-x-3">
+              {realGames.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-400">Datos en tiempo real - TheSportsDB</span>
+                </div>
+              )}
+              {loading && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xs text-blue-400">Cargando eventos...</span>
+                </div>
+              )}
+              {error && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-red-400">⚠️ {error}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {filteredGames.length === 0 ? (
+            <div className="bg-[#2a2d47] border border-gray-600 rounded-xl p-8 text-center">
+              <div className="text-4xl mb-4">🏟️</div>
+              <h3 className="text-xl font-semibold text-white mb-2">No hay eventos disponibles</h3>
+              <p className="text-gray-400 mb-4">
+                {sportFilter 
+                  ? `No encontramos eventos para ${sportFilter} en este momento.` 
+                  : "No hay eventos programados en este momento."}
+              </p>
+              <button 
+                onClick={fetchTodaysFixtures}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {loading ? 'Cargando...' : '🔄 Actualizar'}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {filteredGames.map((game) => (
                 <div key={game.id} className={`bg-gradient-to-br ${game.bgColor} border border-gray-600 rounded-xl p-4 hover:border-gray-500 transition-all group hover:scale-105 relative overflow-hidden h-full flex flex-col`}>
                   {/* Status indicator */}
                   <div className="absolute top-2 right-2">
@@ -617,7 +798,7 @@ export default function SportsPage() {
                       </div>
                       <div className="text-right">
                         <div className={`text-xs font-bold ${game.color}`}>{game.volume}</div>
-                        <div className="text-xs text-gray-400">{game.totalBets} apuestas</div>
+                        <div className="text-xs text-gray-400">{game.totalBets} retos</div>
                       </div>
                     </div>
 
@@ -675,7 +856,7 @@ export default function SportsPage() {
 
                   {/* Botón de acción - siempre en la parte inferior */}
                   <div className="pt-3 border-t border-gray-600 mt-auto">
-                    <Link href={`/sports/create?matchId=${game.id}&matchTitle=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&teams=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&date=${encodeURIComponent(game.date)}&time=${encodeURIComponent(game.time)}&league=${encodeURIComponent(game.league)}&sport=${encodeURIComponent(game.sport)}`}>
+                    <Link href={`/sports/create?matchId=${game.id}&matchTitle=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&teams=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&date=${encodeURIComponent(game.date)}&time=${encodeURIComponent(game.time)}&league=${encodeURIComponent(game.league)}&sport=${encodeURIComponent(game.sport)}${gameCount > 1 ? `&gameCount=${gameCount}` : ''}`}>
                       <button className="w-full py-2 px-3 rounded-lg transition-all font-medium text-xs bg-blue-600 hover:bg-blue-700 text-white group-hover:shadow-lg">
                         ➕ Crear Reto
                       </button>
@@ -683,7 +864,8 @@ export default function SportsPage() {
                   </div>
                 </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Información adicional */}
@@ -716,19 +898,27 @@ export default function SportsPage() {
           </div>
 
           <div className="bg-[#2a2d47] rounded-xl p-6 border border-gray-600">
-            <h3 className="text-xl font-semibold text-white mb-4">📊 Estadísticas Globales</h3>
+            <h3 className="text-xl font-semibold text-white mb-4">📊 Estadísticas en Tiempo Real</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Total Juegos Hoy</span>
-                <span className="text-white font-semibold">157</span>
+                <span className="text-gray-400">Eventos Disponibles</span>
+                <span className="text-white font-semibold">{allGames?.length || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Apuestas Activas</span>
-                <span className="text-blue-400 font-semibold">2,847</span>
+                <span className="text-gray-400">Deportes Activos</span>
+                <span className="text-blue-400 font-semibold">{availableSports?.length || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Volumen Total</span>
-                <span className="text-green-400 font-semibold">$7.45M</span>
+                <span className="text-gray-400">Eventos en Vivo</span>
+                <span className="text-green-400 font-semibold">
+                  {allGames?.filter(game => game?.status === 'live')?.length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Estado API</span>
+                <span className={`font-semibold ${error ? 'text-red-400' : 'text-green-400'}`}>
+                  {error ? 'Error' : loading ? 'Cargando...' : 'Conectado'}
+                </span>
               </div>
             </div>
           </div>
@@ -736,18 +926,23 @@ export default function SportsPage() {
           <div className="bg-[#2a2d47] rounded-xl p-6 border border-gray-600">
             <h3 className="text-xl font-semibold text-white mb-4">🎯 Próximos Eventos</h3>
             <div className="space-y-3">
-              <div className="text-sm">
-                <div className="text-white font-medium">Real Madrid vs Barcelona</div>
-                <div className="text-gray-400">Hoy 20:00 - La Liga</div>
-              </div>
-              <div className="text-sm">
-                <div className="text-white font-medium">Lakers vs Warriors</div>
-                <div className="text-gray-400">Mañana 22:30 - NBA</div>
-              </div>
-              <div className="text-sm">
-                <div className="text-white font-medium">Wimbledon Final</div>
-                <div className="text-gray-400">Dom 15:00 - ATP</div>
-              </div>
+              {allGames && allGames.length > 0 ? allGames.slice(0, 4).map((game, index) => (
+                <div key={game?.id || index} className="text-sm">
+                  <div className="text-white font-medium">
+                    {game?.homeTeam || 'TBD'} vs {game?.awayTeam || 'TBD'}
+                  </div>
+                  <div className="text-gray-400">
+                    {game?.date || 'TBD'} {game?.time || ''} - {game?.league || 'Liga'}
+                  </div>
+                  {game?.status === 'live' && (
+                    <div className="text-red-400 text-xs font-bold">🔴 EN VIVO</div>
+                  )}
+                </div>
+              )) : (
+                <div className="text-sm text-gray-400 text-center py-4">
+                  No hay eventos próximos disponibles
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -770,6 +965,8 @@ export default function SportsPage() {
           </div>
         </div>
       </div>
+      
+      <Footer />
     </div>
   );
 }

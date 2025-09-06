@@ -40,7 +40,7 @@ const marketTypes: MarketType[] = [
   {
     id: '3',
     title: 'Predicción Simple',
-    description: 'Apuesta directa sobre el resultado de un evento específico',
+    description: 'Reto directo sobre el resultado de un evento específico',
     icon: '🎯',
     iconColor: 'text-blue-400',
     backgroundColor: 'from-blue-900/20 to-blue-800/10',
@@ -51,7 +51,7 @@ const marketTypes: MarketType[] = [
   {
     id: '4',
     title: 'Mercado Over/Under',
-    description: 'Apuesta sobre si un valor será mayor o menor a un número',
+    description: 'Reto sobre si un valor será mayor o menor a un número',
     icon: '📊',
     iconColor: 'text-yellow-400',
     backgroundColor: 'from-yellow-900/20 to-yellow-800/10',
@@ -62,13 +62,13 @@ const marketTypes: MarketType[] = [
   {
     id: '5',
     title: 'Desafío 1v1',
-    description: 'Duelo directo entre dos participantes con apuesta igualada',
+    description: 'Duelo directo entre dos participantes con reto igualado',
     icon: '🥊',
     iconColor: 'text-purple-400',
     backgroundColor: 'from-purple-900/20 to-purple-800/10',
     difficulty: 'Avanzado',
     estimatedTime: '10 min',
-    features: ['Duelo directo', 'Apuestas igualadas', 'Negociación privada']
+    features: ['Duelo directo', 'Retos igualados', 'Negociación privada']
   },
   {
     id: '6',
@@ -153,14 +153,16 @@ export default function CreateChallengeePage() {
 
               {/* Botón de acción - siempre al final */}
               <div className="mt-auto pt-4 border-t border-gray-600">
-                <button className={`w-full py-3 px-4 rounded-lg transition-all font-medium text-sm
-                  ${market.difficulty === 'Básico' ? 'bg-green-600 hover:bg-green-700' :
-                    market.difficulty === 'Intermedio' ? 'bg-yellow-600 hover:bg-yellow-700' :
-                    'bg-red-600 hover:bg-red-700'
-                  } text-white group-hover:shadow-lg`}
-                >
-                  Crear {market.title}
-                </button>
+                <Link href={`/config?type=${market.id}&title=${encodeURIComponent(market.title)}&icon=${encodeURIComponent(market.icon)}&description=${encodeURIComponent(market.description)}`}>
+                  <button className={`w-full py-3 px-4 rounded-lg transition-all font-medium text-sm
+                    ${market.difficulty === 'Básico' ? 'bg-green-600 hover:bg-green-700' :
+                      market.difficulty === 'Intermedio' ? 'bg-yellow-600 hover:bg-yellow-700' :
+                      'bg-red-600 hover:bg-red-700'
+                    } text-white group-hover:shadow-lg`}
+                  >
+                    Crear {market.title}
+                  </button>
+                </Link>
               </div>
             </div>
           ))}
@@ -194,7 +196,7 @@ export default function CreateChallengeePage() {
                   3
                 </div>
                 <div>
-                  <h4 className="text-white font-medium">Apuesta responsable</h4>
+                  <h4 className="text-white font-medium">Reto responsable</h4>
                   <p className="text-gray-400 text-sm">Establece montos apropiados y tiempos de resolución realistas</p>
                 </div>
               </div>
