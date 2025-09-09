@@ -69,10 +69,24 @@ export function useBetting() {
         .eq('is_public', true)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Database error fetching challenges:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+      
       setChallenges(data || [])
-    } catch (error) {
-      console.error('Error fetching challenges:', error)
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error occurred'
+      console.error('Error fetching challenges:', {
+        error: errorMessage,
+        stack: error.stack,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'
+      })
     }
   }
 

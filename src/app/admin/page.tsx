@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import BackButton from '@/components/BackButton';
 import { BettingChallenge, Transaction, UserStats } from '@/types/betting';
 
 // Mock data para el dashboard administrativo
@@ -140,11 +141,12 @@ export default function AdminDashboard() {
               <option value="30d">Últimos 30 días</option>
               <option value="90d">Últimos 90 días</option>
             </select>
-            <Link href="/">
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                ← Volver al App
-              </button>
-            </Link>
+            <BackButton 
+              fallbackUrl="/"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              ← Volver al App
+            </BackButton>
           </div>
         </div>
       </div>

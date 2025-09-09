@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserBet, UserStats, Transaction, UserBalance, BetType, BetStatus, ResolutionMode } from '@/types/betting';
 import { useBalance } from '@/hooks/useBalance';
@@ -28,77 +28,8 @@ const mockUserStats: UserStats = {
   currentStreak: 3
 };
 
-const mockUserBets: UserBet[] = [
-  {
-    id: '1',
-    title: 'Real Madrid vs Barcelona',
-    betType: BetType.SIMPLE,
-    resolutionMode: ResolutionMode.EXACT,
-    status: BetStatus.ACTIVE,
-    stake: '100.00',
-    userPrediction: 2,
-    participants: 5,
-    maxParticipants: 20,
-    dateCreated: '2024-01-28',
-    endDate: '2024-01-30',
-    sport: 'Fútbol',
-    league: 'La Liga',
-    icon: '⚽',
-    iconBg: 'bg-green-500'
-  },
-  {
-    id: '2',
-    title: 'Lakers vs Warriors',
-    betType: BetType.ONE_VS_ONE,
-    resolutionMode: ResolutionMode.CLOSEST,
-    status: BetStatus.PENDING,
-    stake: '200.00',
-    userPrediction: 115,
-    participants: 2,
-    maxParticipants: 2,
-    dateCreated: '2024-01-27',
-    endDate: '2024-01-29',
-    sport: 'Baloncesto',
-    league: 'NBA',
-    icon: '🏀',
-    iconBg: 'bg-orange-500'
-  },
-  {
-    id: '3',
-    title: 'Champions League Final',
-    betType: BetType.TOURNAMENT,
-    resolutionMode: ResolutionMode.MULTI_WINNER,
-    status: BetStatus.RESOLVED,
-    stake: '50.00',
-    winnings: '125.75',
-    participants: 16,
-    maxParticipants: 20,
-    dateCreated: '2024-01-25',
-    endDate: '2024-01-27',
-    outcome: 1,
-    sport: 'Fútbol',
-    league: 'UEFA',
-    icon: '🏆',
-    iconBg: 'bg-blue-500'
-  },
-  {
-    id: '4',
-    title: 'Tennis Masters 1000',
-    betType: BetType.GROUP_BALANCED,
-    resolutionMode: ResolutionMode.EXACT,
-    status: BetStatus.LOCKED,
-    stake: '75.00',
-    userPrediction: 3,
-    participants: 8,
-    maxParticipants: 10,
-    dateCreated: '2024-01-26',
-    endDate: '2024-01-28',
-    sport: 'Tenis',
-    league: 'ATP',
-    icon: '🎾',
-    iconBg: 'bg-yellow-500'
-  }
-];
+// Lista vacía inicialmente - se llenará cuando el usuario se una o cree retos
+const mockUserBets: UserBet[] = [];
 
 const mockTransactions: Transaction[] = [
   {
@@ -147,6 +78,52 @@ export default function UserPanel({ username }: UserPanelProps) {
   const [selectedTab, setSelectedTab] = useState<'posiciones' | 'historial' | 'analytics'>('posiciones');
   const { balance, transactions, isLoading, addTransaction, updateBalance } = useBalance();
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [userBets, setUserBets] = useState<UserBet[]>(mockUserBets);
+
+  // Función para agregar un nuevo reto a la lista de posiciones
+  const addUserBet = (bet: UserBet) => {
+    setUserBets(prev => [bet, ...prev]);
+  };
+
+  // Simular agregar el reto de desafío múltiple si el usuario se unió
+  useEffect(() => {
+    // Solo ejecutar en el cliente para evitar hydration issues
+    if (typeof window === 'undefined') return;
+    
+    // Verificar si el usuario se unió al reto de challenge desde URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const joined = urlParams.get('joined');
+    const challengeId = urlParams.get('id');
+    
+    if (joined === 'true' && challengeId === 'challenge_001') {
+      const newBet: UserBet = {
+        id: challengeId,
+        title: 'Real Madrid vs Barcelona - Multi-Apuesta',
+        betType: BetType.MULTI,
+        resolutionMode: ResolutionMode.CLOSEST,
+        status: BetStatus.ACTIVE,
+        stake: '150.00',
+        userPrediction: 'Múltiple',
+        participants: 16,
+        maxParticipants: 25,
+        dateCreated: new Date().toLocaleDateString('es-ES'),
+        endDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES'),
+        sport: 'Fútbol',
+        league: 'La Liga',
+        icon: '⚽',
+        iconBg: 'bg-green-500'
+      };
+      
+      // Usar setUserBets con función para evitar duplicados
+      setUserBets(prev => {
+        const existingBet = prev.find(bet => bet.id === challengeId);
+        if (!existingBet) {
+          return [newBet, ...prev];
+        }
+        return prev;
+      });
+    }
+  }, []);
 
   const handleDeposit = (amount: number) => {
     // Agregar transacción de depósito
@@ -295,62 +272,86 @@ export default function UserPanel({ username }: UserPanelProps) {
       <div className="flex-1 overflow-y-auto">
         {selectedTab === 'posiciones' && (
           <div className="space-y-3">
-            {mockUserBets.map((bet) => (
-              <div key={bet.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center">
-                    <div className={`w-8 h-8 ${bet.iconBg} rounded-lg flex items-center justify-center text-white mr-3 text-sm`}>
-                      {bet.icon}
-                    </div>
-                    <div>
-                      <div className="text-white font-medium text-sm">{bet.title}</div>
-                      <div className="text-gray-400 text-xs">{bet.league} • {getBetTypeLabel(bet.betType)}</div>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${getBetStatusColor(bet.status)}`}>
-                    {bet.status === BetStatus.ACTIVE ? '🟢 Activo' :
-                     bet.status === BetStatus.PENDING ? '🟡 Pendiente' :
-                     bet.status === BetStatus.RESOLVED ? '✅ Ganado' :
-                     bet.status === BetStatus.LOCKED ? '🔒 Bloqueado' : '❌ Cancelado'}
-                  </span>
+            {userBets.length === 0 ? (
+              // Estado vacío cuando no hay posiciones
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">📈</span>
                 </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Apuesta</span>
-                    <span className="text-white font-medium">${bet.stake}</span>
+                <h3 className="text-white font-medium mb-2">Sin posiciones activas</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Tus retos creados y en los que participes aparecerán aquí
+                </p>
+                <div className="space-y-2 text-xs text-gray-500">
+                  <div className="flex items-center justify-center">
+                    <span className="mr-2">🎯</span>
+                    <span>Únete a retos existentes</span>
                   </div>
-                  {bet.userPrediction && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Mi predicción</span>
-                      <span className="text-blue-400 font-medium">{bet.userPrediction}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Participantes</span>
-                    <span className="text-white">{bet.participants}/{bet.maxParticipants}</span>
-                  </div>
-                  {bet.winnings && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Ganancia</span>
-                      <span className="text-green-400 font-bold">+${bet.winnings}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-gray-600 flex justify-between items-center text-xs">
-                  <span className="text-gray-500">📅 {bet.dateCreated}</span>
-                  <div className="flex space-x-2">
-                    <button className="text-blue-400 hover:underline">Ver detalles</button>
-                    {username === '77paladio' && (
-                      <Link href="/admin">
-                        <button className="text-red-400 hover:underline text-xs">Admin</button>
-                      </Link>
-                    )}
+                  <div className="flex items-center justify-center">
+                    <span className="mr-2">➕</span>
+                    <span>Crea nuevos retos</span>
                   </div>
                 </div>
               </div>
-            ))}
+            ) : (
+              // Lista de posiciones cuando hay retos
+              userBets.map((bet) => (
+                <div key={bet.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <div className={`w-8 h-8 ${bet.iconBg} rounded-lg flex items-center justify-center text-white mr-3 text-sm`}>
+                        {bet.icon}
+                      </div>
+                      <div>
+                        <div className="text-white font-medium text-sm">{bet.title}</div>
+                        <div className="text-gray-400 text-xs">{bet.league} • {getBetTypeLabel(bet.betType)}</div>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${getBetStatusColor(bet.status)}`}>
+                      {bet.status === BetStatus.ACTIVE ? '🟢 Activo' :
+                       bet.status === BetStatus.PENDING ? '🟡 Pendiente' :
+                       bet.status === BetStatus.RESOLVED ? '✅ Ganado' :
+                       bet.status === BetStatus.LOCKED ? '🔒 Bloqueado' : '❌ Cancelado'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Apuesta</span>
+                      <span className="text-white font-medium">${bet.stake}</span>
+                    </div>
+                    {bet.userPrediction && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Mi predicción</span>
+                        <span className="text-blue-400 font-medium">{bet.userPrediction}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Participantes</span>
+                      <span className="text-white">{bet.participants}/{bet.maxParticipants}</span>
+                    </div>
+                    {bet.winnings && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Ganancia</span>
+                        <span className="text-green-400 font-bold">+${bet.winnings}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t border-gray-600 flex justify-between items-center text-xs">
+                    <span className="text-gray-500">📅 {bet.dateCreated}</span>
+                    <div className="flex space-x-2">
+                      <button className="text-blue-400 hover:underline">Ver detalles</button>
+                      {username === '77paladio' && (
+                        <Link href="/admin">
+                          <button className="text-red-400 hover:underline text-xs">Admin</button>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 

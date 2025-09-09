@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link';
+import BackButton from '@/components/BackButton';
 
 interface MarketType {
   id: string;
@@ -89,9 +90,9 @@ export default function CreateChallengeePage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className="text-gray-400 hover:text-white flex items-center mb-4">
+          <BackButton fallbackUrl="/">
             ← Volver al inicio
-          </Link>
+          </BackButton>
           <h1 className="text-3xl font-bold text-white mb-2">Crear Nuevo Reto</h1>
           <p className="text-gray-400">Selecciona el tipo de mercado para tu reto deportivo</p>
         </div>

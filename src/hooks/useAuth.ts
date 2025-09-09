@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
+import { UserProfile } from '@/types/betting'
 
 interface AuthState {
   user: User | null
@@ -8,17 +9,7 @@ interface AuthState {
   loading: boolean
 }
 
-interface UserProfile {
-  id: string
-  username?: string
-  wallet_address?: string
-  network: string
-  balance_usdc: number
-  balance_locked: number
-  avatar_url?: string
-  bio?: string
-  is_verified: boolean
-}
+// UserProfile movido a src/types/betting.ts para evitar duplicación
 
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({

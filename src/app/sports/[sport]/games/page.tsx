@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import BackButton from '@/components/BackButton';
 import { useParams } from 'next/navigation';
 
 interface Game {
@@ -177,9 +178,9 @@ export default function SportGamesPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/sports" className="text-gray-400 hover:text-white flex items-center mb-4">
+          <BackButton fallbackUrl="/sports">
             ← Volver a Deportes
-          </Link>
+          </BackButton>
           <div className="flex items-center mb-4">
             <div className={`w-12 h-12 bg-[#2a2d47] rounded-xl flex items-center justify-center text-2xl ${currentSport.color} mr-4`}>
               {currentSport.icon}

@@ -4,35 +4,35 @@ export const RESOLUTION_MODES: Record<ResolutionMode, ResolutionModeInfo> = {
   [ResolutionMode.EXACT]: {
     name: 'Exacta',
     icon: '🎯',
-    description: 'Solo ganan los participantes que acierten exactamente el resultado final. Si nadie acierta, se regresan las criptomonedas a todos los participantes',
-    example: 'Si el resultado es "Barcelona 2-1 Real Madrid", solo ganan quienes predijeron exactamente "2-1". Si nadie predijo 2-1, todos recuperan su reto',
+    description: 'SOLO UNA PERSONA puede ganar. Debe acertar exactamente el resultado final. Si nadie acierta exactamente, se devuelve el 100% de las criptomonedas a todos los participantes sin penalización',
+    example: 'Si el resultado es "Barcelona 2-1 Real Madrid", SOLO gana UNA PERSONA: quien predijo exactamente "2-1". Si múltiples predicen 2-1, el PRIMERO que apostó gana todo. Si nadie predijo 2-1 exactamente, todos recuperan su dinero',
     difficulty: 'Difícil',
     winChance: 'Baja',
-    prizeDistribution: 'Los ganadores se dividen el 95% del pozo total. Sin ganadores: reembolso completo'
+    prizeDistribution: 'Ganador único toma el 95% del pozo total. Sin ganadores: reembolso completo del 100%'
   },
   [ResolutionMode.CLOSEST]: {
     name: 'Más Cercano',
     icon: '🔥',
-    description: 'Gana quien más se acerque al resultado real, aunque no sea exacto',
-    example: 'Si el resultado son 78 puntos y las predicciones son 75, 80, 85, gana quien predijo 80',
+    description: 'SOLO UNA PERSONA gana: quien más se acerque al resultado real, aunque no sea exacto. Siempre hay un ganador garantizado',
+    example: 'Si el resultado son 78 puntos y las predicciones son 75, 80, 85, gana SOLO UNA PERSONA: quien predijo 80 (diferencia de 2 puntos)',
     difficulty: 'Medio',
     winChance: 'Media',
-    prizeDistribution: 'El participante más cercano gana el 95% del pozo'
+    prizeDistribution: 'El participante más cercano gana el 95% del pozo. Solo un ganador'
   },
   [ResolutionMode.MULTI_WINNER]: {
     name: 'Multi-Ganador',
     icon: '🏆',
-    description: 'Múltiples participantes pueden ganar según criterios flexibles',
-    example: 'Top 3 predicciones más cercanas, o todos dentro de un rango específico',
+    description: 'MÚLTIPLES participantes pueden ganar según criterios flexibles. Mayor oportunidad de ganar, pero premios divididos',
+    example: 'Top 3 predicciones más cercanas: 1° lugar gana 60%, 2° lugar gana 25%, 3° lugar gana 15%',
     difficulty: 'Fácil',
     winChance: 'Alta',
-    prizeDistribution: 'Se divide entre ganadores (ej: 1° 60%, 2° 25%, 3° 15%)'
+    prizeDistribution: 'Se divide entre múltiples ganadores (ej: 1° 60%, 2° 25%, 3° 15%)'
   },
   [ResolutionMode.GROUP_WINNER]: {
     name: 'Grupo Ganador',
     icon: '⚖️',
-    description: 'El grupo con más predicciones acertadas gana. Las ganancias se distribuyen entre todos los integrantes del grupo ganador',
-    example: 'Grupo A: 8 aciertos de 20 participantes, Grupo B: 6 aciertos de 20 participantes. Todos los integrantes del Grupo A ganan',
+    description: 'El grupo con más predicciones acertadas gana. Las ganancias se distribuyen equitativamente entre TODOS los integrantes del grupo ganador',
+    example: 'Grupo A: 8 aciertos de 20 participantes, Grupo B: 6 aciertos de 20 participantes. Los 20 integrantes del Grupo A ganan y se reparten el premio',
     difficulty: 'Medio',
     winChance: 'Media-Alta',
     prizeDistribution: 'El 95% del pozo se divide equitativamente entre todos los integrantes del grupo ganador'
@@ -58,7 +58,7 @@ export function calculatePrizeDistribution(
 
   switch (mode) {
     case ResolutionMode.EXACT:
-      // En modo exacto, todos los ganadores se dividen el premio equitativamente
+      // En modo exacto, SOLO UNA PERSONA puede ganar
       // Si no hay ganadores (estimatedWinners = 0), se devuelve el 100% a cada participante
       if (estimatedWinners === 0) {
         return [{
@@ -67,18 +67,19 @@ export function calculatePrizeDistribution(
           amount: totalPrize // Reembolso completo sin fees
         }];
       }
+      // SOLO UN GANADOR - el primero que apostó con la predicción correcta
       return [{
         position: 1,
         percentage: 95,
-        amount: netPrize / Math.max(1, estimatedWinners)
+        amount: netPrize // TODO el premio para UNA SOLA PERSONA
       }];
 
     case ResolutionMode.CLOSEST:
-      // En modo más cercano, solo hay un ganador
+      // En modo más cercano, SOLO UNA PERSONA gana - la más cercana
       return [{
         position: 1,
         percentage: 95,
-        amount: netPrize
+        amount: netPrize // TODO el premio para UNA SOLA PERSONA
       }];
 
     case ResolutionMode.MULTI_WINNER:
@@ -120,15 +121,47 @@ export function allowsRefunds(mode: ResolutionMode): boolean {
 export function getRefundText(mode: ResolutionMode): string {
   switch (mode) {
     case ResolutionMode.EXACT:
-      return 'Si nadie acierta exactamente, se devuelve el 100% de los retos sin fees';
+      return 'Si nadie acierta exactamente, se devuelve el 100% de los retos sin fees. SOLO UNA PERSONA puede ganar';
     case ResolutionMode.CLOSEST:
-      return 'Siempre hay ganador: quien esté más cerca del resultado';
+      return 'Siempre hay UN SOLO ganador: quien esté más cerca del resultado';
     case ResolutionMode.MULTI_WINNER:
-      return 'Múltiples criterios de victoria: mayor probabilidad de ganar';
+      return 'Múltiples criterios de victoria: mayor probabilidad de ganar para varios participantes';
     case ResolutionMode.GROUP_WINNER:
       return 'Competencia por grupos: todos los integrantes del grupo con más aciertos ganan';
     default:
       return '';
+  }
+}
+
+/**
+ * Indica si el modo permite solo un ganador
+ */
+export function isSingleWinnerMode(mode: ResolutionMode): boolean {
+  return mode === ResolutionMode.EXACT || mode === ResolutionMode.CLOSEST;
+}
+
+/**
+ * Indica si el modo permite múltiples ganadores
+ */
+export function isMultiWinnerMode(mode: ResolutionMode): boolean {
+  return mode === ResolutionMode.MULTI_WINNER || mode === ResolutionMode.GROUP_WINNER;
+}
+
+/**
+ * Obtiene el número máximo de ganadores para un modo
+ */
+export function getMaxWinners(mode: ResolutionMode): number {
+  switch (mode) {
+    case ResolutionMode.EXACT:
+      return 1; // SOLO UNA PERSONA
+    case ResolutionMode.CLOSEST:
+      return 1; // SOLO UNA PERSONA
+    case ResolutionMode.MULTI_WINNER:
+      return 5; // Configurable, hasta 5
+    case ResolutionMode.GROUP_WINNER:
+      return Infinity; // Todos los integrantes del grupo ganador
+    default:
+      return 1;
   }
 }
 

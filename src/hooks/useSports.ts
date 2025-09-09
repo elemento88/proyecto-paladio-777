@@ -16,6 +16,8 @@ import {
   FreeSportsAPI,
   TheSportsDbAPI 
 } from '@/lib/theSportsDbApi'
+import { getCurrentFootballMatches } from '@/lib/footballApi'
+import { getMassiveSportsEvents } from '@/lib/massiveSportsApi'
 
 interface UseSportsReturn {
   // Data states
@@ -108,26 +110,46 @@ export function useSports(): UseSportsReturn {
     }
   }, [updateRateLimit])
 
-  // Fetch today's fixtures - Usa TheSportsDB (gratuito) con fallback a API anterior
+  // Fetch today's fixtures - Usa API masiva con miles de eventos
   const fetchTodaysFixtures = useCallback(async () => {
     try {
       setLoadingFixtures(true)
       setError(null)
       
-      // Intenta primero con TheSportsDB (gratuito)
-      let fixtures = await FreeSportsAPI.getTodaysFixtures()
+      console.log('🚀 Cargando eventos deportivos masivos...')
       
-      // Si no hay datos, intenta con la API anterior (solo si hay requests disponibles)
-      if (fixtures.length === 0 && RateLimiter.canMakeRequest()) {
-        console.info('No data from TheSportsDB, trying fallback API...')
-        fixtures = await SportsAPI.getTodaysFixtures()
+      // Obtener eventos masivos de múltiples deportes y APIs
+      let fixtures = await getMassiveSportsEvents()
+      
+      // Fallback a APIs individuales si es necesario
+      if (fixtures.length < 50) {
+        console.info('Pocos eventos masivos, intentando APIs individuales...')
+        
+        const footballFixtures = await getCurrentFootballMatches()
+        const theSportsDbFixtures = await FreeSportsAPI.getTodaysFixtures()
+        
+        fixtures = [...fixtures, ...footballFixtures, ...theSportsDbFixtures]
+      }
+      
+      // Último fallback si hay muy pocos eventos
+      if (fixtures.length < 20 && RateLimiter.canMakeRequest()) {
+        console.info('Usando API de fallback para más eventos...')
+        const fallbackFixtures = await SportsAPI.getTodaysFixtures()
+        fixtures = [...fixtures, ...fallbackFixtures]
         updateRateLimit()
       }
       
-      setTodaysFixtures(fixtures)
+      // Eliminar duplicados por ID
+      const uniqueFixtures = fixtures.filter((fixture, index, self) => 
+        index === self.findIndex(f => f.id === fixture.id)
+      )
+      
+      console.log(`✅ Total de eventos únicos cargados: ${uniqueFixtures.length}`)
+      setTodaysFixtures(uniqueFixtures)
+      
     } catch (err) {
-      setError('Failed to fetch today\'s fixtures')
-      console.error('Error fetching today\'s fixtures:', err)
+      setError('Failed to fetch massive sports events')
+      console.error('Error fetching massive sports events:', err)
     } finally {
       setLoadingFixtures(false)
     }

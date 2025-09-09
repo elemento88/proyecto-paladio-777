@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  
+  // Fix for multiple lockfiles warning
+  outputFileTracingRoot: __dirname,
+  
   eslint: {
     // Warning: This allows production builds to successfully complete even if
     // your project has ESLint errors.
@@ -13,6 +17,11 @@ const nextConfig: NextConfig = {
     // your project has type errors.
     // !! WARN !!
     ignoreBuildErrors: true,
+  },
+  
+  // Optimize for development to prevent worker issues
+  experimental: {
+    workerThreads: false,
   },
 };
 

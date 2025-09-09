@@ -11,7 +11,7 @@ export interface BettingChallenge {
   type: string;
   description: string;
   stake: string;
-  participants: string;
+  participants: number; // Cambiado de string a number
   timeRemaining: string;
   creator: string;
   odds: string;
@@ -28,7 +28,7 @@ export interface Position {
   type: string;
   status: 'Activo' | 'Pendiente';
   stake: string;
-  participants: string;
+  participants: number; // Cambiado de string a number
   date: string;
 }
 
@@ -50,7 +50,7 @@ export interface Match {
     name: string;
     odds: number;
   };
-  participants: string;
+  participants: number; // Cambiado de string a number
   minBet: string;
   status: 'Próximo' | 'En Vivo' | 'Finalizado';
 }
@@ -67,10 +67,18 @@ export interface MarketType {
 }
 
 export interface UserProfile {
-  username: string;
+  id: string;
+  username?: string;
+  wallet_address?: string;
   network: string;
-  balance: string;
-  gasPrice: string;
+  balance_usdc: number;
+  balance_locked: number;
+  avatar_url?: string;
+  bio?: string;
+  is_verified: boolean;
+  // Compatibilidad con versión anterior
+  balance?: string;
+  gasPrice?: string;
   avatar?: string;
 }
 
@@ -95,8 +103,8 @@ export enum OneVsOneMode {
 }
 
 export enum TournamentType {
-  LEAGUE = 'LEAGUE',
-  KNOCKOUT = 'KNOCKOUT'
+  LEAGUE = 0,
+  KNOCKOUT = 1
 }
 
 // Información detallada de los modos de resolución
@@ -174,6 +182,16 @@ export interface WinnerConfiguration {
   position: number; // 1er lugar, 2do lugar, etc.
   percentage: number; // porcentaje del pozo total
   label: string; // "1er Lugar", "2do Lugar", etc.
+}
+
+// Configuración para Battle Royal con múltiples ganadores
+export interface BattleRoyalConfig {
+  maxParticipants: number;
+  winnerPositions: number; // Número de posiciones ganadoras (ej: top 3)
+  prizeDistribution: WinnerConfiguration[];
+  entryFee: string;
+  eliminationRules: 'SUDDEN_DEATH' | 'CUMULATIVE_SCORE' | 'ROUND_ROBIN';
+  tieBreakMethod: 'TIMESTAMP' | 'RANDOM' | 'SPLIT_PRIZE';
 }
 
 // Configuración específica para cada modo de resolución

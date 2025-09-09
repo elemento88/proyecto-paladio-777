@@ -185,29 +185,8 @@ export const BETTING_PROTOCOL_ABI = [
   'event LimitsUpdated(uint256 oldLimit, uint256 newLimit)',
 ];
 
-// Enums del protocolo
-export enum BetType {
-  SIMPLE = 0,
-  TOURNAMENT = 1,
-  GROUP_BALANCED = 2,
-  ONE_VS_ONE = 3,
-}
-
-export enum ResolutionMode {
-  EXACT = 0,
-  CLOSEST = 1,
-  MULTI_WINNER = 2,
-}
-
-export enum OneVsOneMode {
-  CLASSIC = 0,
-  MARKET = 1,
-}
-
-export enum TournamentType {
-  LEAGUE = 0,
-  KNOCKOUT = 1,
-}
+// Enums importados desde types/betting.ts para evitar duplicación
+// Los enums están definidos en src/types/betting.ts
 
 // Configuración de fees
 export const FEES_CONFIG = {

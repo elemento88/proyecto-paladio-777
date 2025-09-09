@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Match } from '@/types/betting';
+import BackButton from '@/components/BackButton';
 
 const mockMatches: Match[] = [
   {
@@ -71,9 +72,7 @@ export default function MatchesPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header con filtros */}
         <div className="mb-8">
-          <button className="text-gray-400 hover:text-white flex items-center mb-4">
-            ← Volver
-          </button>
+          <BackButton />
           
           <div className="flex items-center justify-between mb-6">
             <div>

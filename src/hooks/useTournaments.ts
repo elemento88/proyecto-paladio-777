@@ -99,6 +99,8 @@ export function useTournaments() {
   const fetchTournaments = async () => {
     try {
       setLoading(true)
+      
+      // First check if the tables exist by trying to get the table info
       const { data, error } = await supabase
         .from('betting_challenges')
         .select(`
@@ -111,12 +113,26 @@ export function useTournaments() {
         .eq('is_public', true)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Database error fetching tournaments:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+      
       setTournaments(data || [])
       return { data, error: null }
     } catch (error: any) {
-      console.error('Error fetching tournaments:', error)
-      return { data: null, error: error.message }
+      const errorMessage = error.message || 'Unknown error occurred'
+      console.error('Error fetching tournaments:', {
+        error: errorMessage,
+        stack: error.stack,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing'
+      })
+      return { data: null, error: errorMessage }
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 'use client'
 
 import { MarketType } from '@/types/betting';
+import BackButton from '@/components/BackButton';
 
 const marketTypes: MarketType[] = [
   {
@@ -51,9 +52,7 @@ export default function MarketsPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <button className="text-gray-400 hover:text-white flex items-center mb-4">
-            ← Volver
-          </button>
+          <BackButton />
           <h1 className="text-3xl font-bold text-white mb-2">Tipos de Mercado</h1>
           <p className="text-gray-400">Explora diferentes modalidades de retos disponibles</p>
         </div>

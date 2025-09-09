@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { BetType, ResolutionMode } from '@/types/betting';
 import HomeButton from '@/components/HomeButton';
 import Footer from '@/components/Footer';
+import BackButton from '@/components/BackButton';
 // Datos de eventos de fútbol inline para evitar problemas de importación JSON
 
 interface MatchData {
@@ -321,6 +322,132 @@ function CreateBetFromSportsContent() {
   });
   const [storedMatches, setStoredMatches] = useState<StoredMatch[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>('Todos');
+  
+  // Estados para modalidades y modos de resolución
+  const [selectedModality, setSelectedModality] = useState<string | null>(null);
+  const [selectedResolutionMode, setSelectedResolutionMode] = useState<string | null>(null);
+
+  // Estados para configuración básica del reto
+  const [basicConfig, setBasicConfig] = useState({
+    title: '',
+    description: '',
+    betAmount: '50',
+    maxParticipants: '20',
+    maxGroups: '5'
+  });
+
+  // Estados para configuraciones específicas de modos de resolución
+  const [multiWinnerConfig, setMultiWinnerConfig] = useState({
+    winnerPercentage: 15,
+    maxParticipants: 100,
+    prizeDistribution: [
+      { position: 1, percentage: 60 },
+      { position: 2, percentage: 25 },
+      { position: 3, percentage: 15 }
+    ]
+  });
+
+  const [closestModeConfig, setClosestModeConfig] = useState({
+    proximityType: 'ABSOLUTE' as 'ABSOLUTE' | 'PERCENTAGE',
+    allowTies: false,
+    maxWinners: 1
+  });
+
+  const [exactModeConfig, setExactModeConfig] = useState({
+    allowMultipleWinners: false,
+    tieBreakMethod: 'NO_TIES' as 'SPLIT_PRIZE' | 'NO_TIES'
+  });
+
+  // Modos de resolución disponibles para cada modalidad (coincidiendo con página principal)
+  const resolutionModes = {
+    'battle-royal': [
+      { id: 'EXACT', name: '🎯 Exacta', description: 'Solo coincidencias perfectas ganan', icon: '🎯', color: 'green' },
+      { id: 'CLOSEST', name: '🔥 Más Cercano', description: 'Gana la predicción más cercana', icon: '🔥', color: 'blue' },
+      { id: 'MULTI_WINNER', name: '🏆 Multi-Ganador', description: 'Múltiples ganadores posibles (3-5 premios)', icon: '🏆', color: 'purple' },
+    ],
+    'group-balanced': [
+      { id: 'GROUP_WINNER', name: '⚖️ Grupo Ganador (Obligatorio)', description: 'El grupo con más predicciones acertadas gana. Las ganancias se distribuyen entre todos los integrantes del grupo ganador.', icon: '⚖️', color: 'teal', mandatory: true },
+    ],
+    'simple': [
+      { id: 'EXACT', name: '🎯 Exacta (Obligatorio)', description: 'Para que gane el CREADOR: Debe pasar exactamente lo que predijo. Para que ganen los ACEPTANTES: La predicción del creador debe fallar.', icon: '🎯', color: 'green', mandatory: true },
+    ]
+  };
+
+  useEffect(() => {
+    // Inicializar título automáticamente basado en el partido
+    if (matchData && !basicConfig.title) {
+      const defaultTitle = `${matchData.teams} - Predicción del resultado`;
+      const defaultDescription = `Reto para el partido ${matchData.teams} de ${matchData.league} el ${matchData.date}`;
+      setBasicConfig({
+        ...basicConfig,
+        title: defaultTitle,
+        description: defaultDescription
+      });
+    }
+  }, [matchData]);
+
+  // Actualizar configuración cuando se selecciona una modalidad
+  useEffect(() => {
+    if (selectedModality) {
+      const defaultValues = {
+        'battle-royal': { maxParticipants: '100', betAmount: '50' },
+        'group-balanced': { maxParticipants: '20', betAmount: '25', maxGroups: '5' },
+        'simple': { maxParticipants: '10', betAmount: '50' }
+      };
+      
+      const defaults = defaultValues[selectedModality as keyof typeof defaultValues];
+      if (defaults) {
+        setBasicConfig(prev => ({
+          ...prev,
+          ...defaults
+        }));
+        
+        // Actualizar también multi-winner config
+        if (selectedModality === 'battle-royal') {
+          setMultiWinnerConfig(prev => ({
+            ...prev,
+            maxParticipants: parseInt(defaults.maxParticipants)
+          }));
+        }
+      }
+    }
+  }, [selectedModality]);
+
+  // Función de validación completa
+  const validateConfiguration = () => {
+    const errors = [];
+    
+    if (!basicConfig.title.trim()) {
+      errors.push('Título es requerido');
+    }
+    
+    if (!basicConfig.betAmount || parseFloat(basicConfig.betAmount) < 1) {
+      errors.push('Cantidad del reto debe ser mayor a 0');
+    }
+    
+    if (!basicConfig.maxParticipants || parseInt(basicConfig.maxParticipants) < 2) {
+      errors.push('Debe permitir al menos 2 participantes');
+    }
+    
+    if (selectedModality === 'group-balanced' && (!basicConfig.maxGroups || parseInt(basicConfig.maxGroups) < 2)) {
+      errors.push('Group Balanced requiere al menos 2 grupos');
+    }
+    
+    if (!selectedModality) {
+      errors.push('Debe seleccionar una modalidad de reto');
+    }
+    
+    if (!selectedResolutionMode) {
+      errors.push('Debe seleccionar un modo de resolución');
+    }
+    
+    return errors;
+  };
+
+  // Verificar si la configuración está completa
+  const isConfigurationComplete = () => {
+    return validateConfiguration().length === 0;
+  };
 
   useEffect(() => {
     // Cargar partidos anteriores desde localStorage si es un partido múltiple
@@ -717,11 +844,10 @@ function CreateBetFromSportsContent() {
               <h1 className="font-semibold text-xl">Crear Reto Deportivo</h1>
               <p className="text-sm text-gray-400">Primero selecciona el tipo de reto</p>
             </div>
-            <Link href="/sports">
-              <button className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
-                ← Volver
-              </button>
-            </Link>
+            <BackButton 
+              fallbackUrl="/sports"
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+            />
           </div>
         </div>
         
@@ -752,11 +878,12 @@ function CreateBetFromSportsContent() {
                     🎯 Ir a Crear Reto
                   </button>
                 </Link>
-                <Link href="/sports">
-                  <button className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg">
-                    ← Volver a Deportes
-                  </button>
-                </Link>
+                <BackButton 
+                  fallbackUrl="/sports"
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg"
+                >
+                  ← Volver a Deportes
+                </BackButton>
               </div>
             </div>
           </div>
@@ -792,11 +919,656 @@ function CreateBetFromSportsContent() {
               <p className="text-xs lg:text-sm text-gray-400">Configura tu reto para este partido</p>
             </div>
           </div>
-          <Link href="/sports">
-            <button className="bg-gray-600 hover:bg-gray-700 text-white px-3 lg:px-4 py-2 rounded-lg transition-colors text-sm">
-              ← Volver
-            </button>
-          </Link>
+          <BackButton 
+            fallbackUrl="/sports"
+            className="bg-gray-600 hover:bg-gray-700 text-white px-3 lg:px-4 py-2 rounded-lg transition-colors text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Configuración Básica del Reto */}
+      <div className="w-full px-2 lg:px-4 xl:px-6 py-6 border-b border-gray-700">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
+            <span className="mr-2">⚙️</span>
+            Configuración del Reto
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Título */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Título del Reto *
+              </label>
+              <input
+                type="text"
+                value={basicConfig.title}
+                onChange={(e) => setBasicConfig({...basicConfig, title: e.target.value})}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                placeholder={`Ej: ${matchData?.teams || 'Partido'} - Predicción del resultado`}
+              />
+              <div className="mt-1 text-xs text-gray-400">
+                Describe claramente qué se está prediciendo en este reto
+              </div>
+            </div>
+
+            {/* Descripción */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Descripción
+              </label>
+              <textarea
+                value={basicConfig.description}
+                onChange={(e) => setBasicConfig({...basicConfig, description: e.target.value})}
+                rows={3}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                placeholder="Describe tu reto, reglas específicas y cualquier información adicional..."
+              />
+              <div className="mt-1 text-xs text-gray-400">
+                Información adicional que ayude a los participantes a entender el reto
+              </div>
+            </div>
+
+            {/* Reto base */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Reto Base (USDC) *
+              </label>
+              <input
+                type="number"
+                value={basicConfig.betAmount}
+                onChange={(e) => setBasicConfig({...basicConfig, betAmount: e.target.value})}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                min="1"
+                max="10000"
+              />
+              <div className="mt-1 text-xs text-gray-400">
+                Cantidad que cada participante debe apostar para unirse
+              </div>
+            </div>
+
+            {/* Máximo de participantes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Máximo de Participantes *
+              </label>
+              <input
+                type="number"
+                value={basicConfig.maxParticipants}
+                onChange={(e) => {
+                  const newMaxParticipants = e.target.value;
+                  setBasicConfig({...basicConfig, maxParticipants: newMaxParticipants});
+                  // Actualizar también el config de multi-winner para mantener sincronización
+                  setMultiWinnerConfig({
+                    ...multiWinnerConfig,
+                    maxParticipants: parseInt(newMaxParticipants) || 20
+                  });
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                min="2"
+                max="500"
+              />
+              <div className="mt-1 text-xs text-gray-400">
+                Número máximo de jugadores que pueden participar
+              </div>
+            </div>
+
+            {/* Cantidad de grupos (solo para Group Balanced) */}
+            {selectedModality === 'group-balanced' && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Cantidad de Grupos *
+                </label>
+                <input
+                  type="number"
+                  value={basicConfig.maxGroups}
+                  onChange={(e) => setBasicConfig({...basicConfig, maxGroups: e.target.value})}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  min="2"
+                  max="20"
+                />
+                <div className="mt-1 text-xs text-gray-400">
+                  Se crearán automáticamente hasta {basicConfig.maxGroups} grupos con un máximo de {Math.ceil(parseInt(basicConfig.maxParticipants) / parseInt(basicConfig.maxGroups))} participantes cada uno
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Resumen en tiempo real */}
+          <div className="mt-6 p-4 bg-gray-800/50 border border-gray-600 rounded-lg">
+            <div className="text-sm font-medium text-white mb-3 flex items-center">
+              <span className="mr-2">📊</span>
+              Resumen de Configuración
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="text-gray-400">Stake individual:</div>
+                <div className="text-green-400 font-semibold">${basicConfig.betAmount} USDC</div>
+              </div>
+              <div>
+                <div className="text-gray-400">Participantes máximos:</div>
+                <div className="text-blue-400 font-semibold">{basicConfig.maxParticipants} jugadores</div>
+              </div>
+              <div>
+                <div className="text-gray-400">Premio total estimado:</div>
+                <div className="text-yellow-400 font-semibold">
+                  ${(parseInt(basicConfig.betAmount) * parseInt(basicConfig.maxParticipants)).toLocaleString()} USDC
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400">Estado:</div>
+                <div className={`font-semibold ${basicConfig.title.trim() ? 'text-green-400' : 'text-orange-400'}`}>
+                  {basicConfig.title.trim() ? '✅ Configurado' : '⚠️ Título requerido'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Selector de Modalidades de Reto */}
+      <div className="w-full px-2 lg:px-4 xl:px-6 py-4 border-b border-gray-700">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
+            <span className="mr-2">🎯</span>
+            Modalidades de Reto
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Battle Royal */}
+            <div className="bg-gradient-to-br from-red-900/20 to-red-800/10 border border-red-600/30 rounded-xl p-6 hover:scale-105 transition-all cursor-pointer group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center text-red-400 text-2xl">
+                  ⚔️
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-red-600/20 text-red-400 border border-red-500/30">
+                  Multi-Ganador
+                </span>
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Battle Royal</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Máximo participantes compiten. Los mejores predicciones ganan premios escalonados.
+              </p>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center text-red-400">
+                  <span className="mr-2">🔥</span>
+                  <span>Resolución: Los más cercanos</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">🏆</span>
+                  <span>Premio: Distribución por ranking</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">👥</span>
+                  <span>Participantes: 10-100</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setSelectedModality('battle-royal');
+                  setSelectedResolutionMode(null);
+                }}
+                className={`w-full mt-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedModality === 'battle-royal'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white group-hover:bg-red-600'
+                }`}
+              >
+                {selectedModality === 'battle-royal' ? '✓ Seleccionado' : 'Seleccionar Battle Royal'}
+              </button>
+            </div>
+
+            {/* Group Balanced */}
+            <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/10 border border-blue-600/30 rounded-xl p-6 hover:scale-105 transition-all cursor-pointer group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 text-2xl">
+                  👥
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  Equilibrado
+                </span>
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Group Balanced</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Grupos balanceados por habilidad. Ganadores por grupo compiten por el premio mayor.
+              </p>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center text-blue-400">
+                  <span className="mr-2">⚖️</span>
+                  <span>Resolución: Exacto por grupos</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">🎯</span>
+                  <span>Premio: Ganador toma todo</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">📊</span>
+                  <span>Balance: Por habilidad/ranking</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setSelectedModality('group-balanced');
+                  setSelectedResolutionMode(null);
+                }}
+                className={`w-full mt-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedModality === 'group-balanced'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white group-hover:bg-blue-600'
+                }`}
+              >
+                {selectedModality === 'group-balanced' ? '✓ Seleccionado' : 'Seleccionar Group Balanced'}
+              </button>
+            </div>
+
+            {/* Predicción Simple */}
+            <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-600/30 rounded-xl p-6 hover:scale-105 transition-all cursor-pointer group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center text-green-400 text-2xl">
+                  🎯
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-green-600/20 text-green-400 border border-green-500/30">
+                  Simple
+                </span>
+              </div>
+              <h3 className="text-white font-semibold text-lg mb-2">Predicción Simple</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Reto directo y sencillo. Una predicción, todos contra todos, ganador se lleva todo.
+              </p>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center text-green-400">
+                  <span className="mr-2">✅</span>
+                  <span>Resolución: Predicción exacta</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">💰</span>
+                  <span>Premio: Ganador único</span>
+                </div>
+                <div className="flex items-center text-gray-400">
+                  <span className="mr-2">⚡</span>
+                  <span>Fácil: Perfecto para principiantes</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setSelectedModality('simple');
+                  setSelectedResolutionMode(null);
+                }}
+                className={`w-full mt-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedModality === 'simple'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white group-hover:bg-green-600'
+                }`}
+              >
+                {selectedModality === 'simple' ? '✓ Seleccionado' : 'Seleccionar Simple'}
+              </button>
+            </div>
+          </div>
+
+          {/* Modos de Resolución - Solo aparece cuando se selecciona una modalidad */}
+          {selectedModality && (
+            <div className="mt-6 p-6 bg-gradient-to-r from-gray-800/30 to-gray-700/20 border border-gray-500 rounded-xl">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <span className="mr-2">⚙️</span>
+                Modo de Resolución
+                {resolutionModes[selectedModality as keyof typeof resolutionModes][0]?.mandatory && (
+                  <span className="ml-2 text-xs bg-yellow-600/20 text-yellow-400 px-2 py-1 rounded">
+                    Obligatorio
+                  </span>
+                )}
+              </h3>
+              <div className={`grid gap-4 ${resolutionModes[selectedModality as keyof typeof resolutionModes].length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                {resolutionModes[selectedModality as keyof typeof resolutionModes].map((mode, index) => {
+                  const isSelected = selectedResolutionMode === mode.id;
+                  const isMandatory = mode.mandatory;
+                  const borderColor = mode.color === 'green' ? 'border-green-500' : 
+                                    mode.color === 'blue' ? 'border-blue-500' : 
+                                    mode.color === 'purple' ? 'border-purple-500' : 
+                                    mode.color === 'teal' ? 'border-teal-500' : 'border-gray-600';
+                  const bgColor = mode.color === 'green' ? 'bg-green-500/10' : 
+                                mode.color === 'blue' ? 'bg-blue-500/10' : 
+                                mode.color === 'purple' ? 'bg-purple-500/10' : 
+                                mode.color === 'teal' ? 'bg-teal-500/10' : 'bg-gray-800/30';
+                  const textColor = mode.color === 'green' ? 'text-green-400' : 
+                                  mode.color === 'blue' ? 'text-blue-400' : 
+                                  mode.color === 'purple' ? 'text-purple-400' : 
+                                  mode.color === 'teal' ? 'text-teal-400' : 'text-white';
+
+                  // Auto-select mandatory modes
+                  if (isMandatory && !selectedResolutionMode) {
+                    setSelectedResolutionMode(mode.id);
+                  }
+
+                  return (
+                    <div
+                      key={mode.id}
+                      onClick={() => !isMandatory && setSelectedResolutionMode(mode.id)}
+                      className={`p-4 rounded-lg border transition-all ${
+                        isSelected || isMandatory
+                          ? `${borderColor} ${bgColor} shadow-lg`
+                          : 'border-gray-600 bg-gray-800/30 hover:border-gray-500 cursor-pointer hover:scale-102'
+                      } ${isMandatory ? 'opacity-100' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <span className="text-2xl mr-3">{mode.icon}</span>
+                          <span className={`font-medium ${isSelected || isMandatory ? textColor : 'text-white'}`}>{mode.name}</span>
+                        </div>
+                        {(isSelected || isMandatory) && (
+                          <span className={`text-lg ${textColor}`}>✓</span>
+                        )}
+                      </div>
+                      <p className="text-gray-400 text-sm mb-3">{mode.description}</p>
+                      {isMandatory && (
+                        <div className="flex items-center justify-center text-xs">
+                          <span className="bg-yellow-600/20 text-yellow-400 px-2 py-1 rounded border border-yellow-500/30">
+                            Modo automático para esta modalidad
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Configuraciones específicas por modo de resolución */}
+              
+              {/* Configuración MULTI_WINNER Mode */}
+              {selectedResolutionMode === 'MULTI_WINNER' && (
+                <div className="mt-6 bg-purple-900/20 border border-purple-600/30 rounded-lg p-6">
+                  <h4 className="text-purple-300 font-medium mb-4 flex items-center">
+                    <span className="mr-2">🏆</span>
+                    Configuración Modo Multi-Ganador
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Porcentaje de Ganadores *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={multiWinnerConfig.winnerPercentage}
+                          onChange={(e) => {
+                            const percentage = Math.max(2, Math.min(40, parseInt(e.target.value) || 2));
+                            const winnersCount = Math.ceil((percentage / 100) * multiWinnerConfig.maxParticipants);
+                            
+                            // Generar distribución automática
+                            const generateDistribution = (count: number) => {
+                              const distribution = [];
+                              if (count === 1) {
+                                return [{ position: 1, percentage: 100 }];
+                              }
+                              
+                              let remainingPercentage = 100;
+                              for (let i = 1; i <= count; i++) {
+                                let positionPercentage;
+                                if (i === count) {
+                                  positionPercentage = remainingPercentage;
+                                } else if (i === 1) {
+                                  positionPercentage = Math.floor(60 / (count / 3));
+                                } else {
+                                  positionPercentage = Math.floor(remainingPercentage / (count - i + 1));
+                                }
+                                distribution.push({ position: i, percentage: positionPercentage });
+                                remainingPercentage -= positionPercentage;
+                              }
+                              return distribution;
+                            };
+
+                            setMultiWinnerConfig({
+                              ...multiWinnerConfig,
+                              winnerPercentage: percentage,
+                              prizeDistribution: generateDistribution(winnersCount)
+                            });
+                          }}
+                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500 pr-8"
+                          min="2"
+                          max="40"
+                        />
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">%</span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-400">
+                        Mínimo 2%, máximo 40% de los participantes
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Ganadores Calculados
+                      </label>
+                      <div className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-purple-400 font-semibold">
+                        {Math.ceil((multiWinnerConfig.winnerPercentage / 100) * multiWinnerConfig.maxParticipants)} ganadores
+                      </div>
+                      <div className="mt-1 text-xs text-gray-400">
+                        De {multiWinnerConfig.maxParticipants} participantes máximos
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Información adicional */}
+                  <div className="bg-purple-900/30 border border-purple-600/40 rounded-lg p-3 mb-4">
+                    <div className="flex items-start">
+                      <span className="text-purple-400 mr-2 mt-0.5">ℹ️</span>
+                      <div className="text-sm text-purple-200">
+                        <p className="font-medium mb-1">Cálculo de Ganadores:</p>
+                        <div className="text-purple-300 space-y-1">
+                          <p>• Se permite que múltiples participantes tengan predicciones similares</p>
+                          <p>• Los ganadores se determinan por ranking de precisión</p>
+                          <p>• Si hay predicciones iguales, ganan quienes las hicieron primero (timestamp)</p>
+                          <p>• Si el cálculo da número impar, se redondea hacia arriba</p>
+                          <p>• Ejemplo: {multiWinnerConfig.winnerPercentage}% de {multiWinnerConfig.maxParticipants} = {Math.ceil((multiWinnerConfig.winnerPercentage / 100) * multiWinnerConfig.maxParticipants)} ganadores</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distribución de premios */}
+                  <div className="bg-gray-800/50 rounded-lg p-4">
+                    <h5 className="text-purple-300 font-medium mb-3 flex items-center">
+                      <span className="mr-2">💰</span>
+                      Distribución de Premios
+                    </h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {multiWinnerConfig.prizeDistribution.map((prize, index) => (
+                        <div key={index} className="bg-purple-900/20 rounded-lg p-3 text-center">
+                          <div className="text-purple-400 font-semibold text-lg">#{prize.position}</div>
+                          <div className="text-white font-medium">{prize.percentage}%</div>
+                          <div className="text-gray-400 text-xs">del pozo total</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Configuración CLOSEST Mode */}
+              {selectedResolutionMode === 'CLOSEST' && (
+                <div className="mt-6 bg-blue-900/20 border border-blue-600/30 rounded-lg p-6">
+                  <h4 className="text-blue-300 font-medium mb-4 flex items-center">
+                    <span className="mr-2">🔥</span>
+                    Configuración Modo Más Cercano
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Tipo de Proximidad *
+                      </label>
+                      <select
+                        value={closestModeConfig.proximityType}
+                        onChange={(e) => setClosestModeConfig({
+                          ...closestModeConfig,
+                          proximityType: e.target.value as 'ABSOLUTE' | 'PERCENTAGE'
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="ABSOLUTE">Diferencia Absoluta</option>
+                        <option value="PERCENTAGE">Diferencia Porcentual</option>
+                      </select>
+                      <div className="mt-1 text-xs text-gray-400">
+                        {closestModeConfig.proximityType === 'ABSOLUTE' 
+                          ? 'Ejemplo: Resultado 5, predicciones 3,7 → gana 3 (diferencia: 2)' 
+                          : 'Ejemplo: Resultado 100, predicción 90 → 10% de diferencia'
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Empates Permitidos *
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="allowTies"
+                            checked={!closestModeConfig.allowTies}
+                            onChange={() => setClosestModeConfig({...closestModeConfig, allowTies: false, maxWinners: 1})}
+                            className="mr-2 text-blue-500"
+                          />
+                          <span className="text-white text-sm">No (Solo 1 ganador)</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="allowTies"
+                            checked={closestModeConfig.allowTies}
+                            onChange={() => setClosestModeConfig({...closestModeConfig, allowTies: true})}
+                            className="mr-2 text-blue-500"
+                          />
+                          <span className="text-white text-sm">Sí</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Información del modo */}
+                  <div className="bg-blue-900/30 border border-blue-600/40 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <span className="text-blue-400 mr-2 mt-0.5">ℹ️</span>
+                      <div className="text-sm text-blue-200">
+                        <p className="font-medium mb-1">Funcionamiento:</p>
+                        <div className="text-blue-300 space-y-1">
+                          <p>• Se calcula la distancia entre cada predicción y el resultado real</p>
+                          <p>• Gana la predicción con menor distancia</p>
+                          <p>• Siempre hay un ganador garantizado (el más cercano)</p>
+                          <p>• {closestModeConfig.allowTies ? 'En caso de empate: se dividen los premios' : 'En caso de empate: gana quien predijo primero'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Configuración EXACT Mode */}
+              {selectedResolutionMode === 'EXACT' && (
+                <div className="mt-6 bg-green-900/20 border border-green-600/30 rounded-lg p-6">
+                  <h4 className="text-green-300 font-medium mb-4 flex items-center">
+                    <span className="mr-2">🎯</span>
+                    Configuración Modo Exacto
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Manejo de Múltiples Ganadores *
+                      </label>
+                      <div className="space-y-3">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="exactMode"
+                            checked={!exactModeConfig.allowMultipleWinners}
+                            onChange={() => setExactModeConfig({
+                              ...exactModeConfig, 
+                              allowMultipleWinners: false,
+                              tieBreakMethod: 'NO_TIES'
+                            })}
+                            className="mr-2 text-green-500"
+                          />
+                          <div>
+                            <span className="text-white font-medium">Solo Primer Acierto</span>
+                            <p className="text-gray-400 text-sm">Si varios aciertan, gana quien predijo primero</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="exactMode"
+                            checked={exactModeConfig.allowMultipleWinners}
+                            onChange={() => setExactModeConfig({
+                              ...exactModeConfig, 
+                              allowMultipleWinners: true,
+                              tieBreakMethod: 'SPLIT_PRIZE'
+                            })}
+                            className="mr-2 text-green-500"
+                          />
+                          <div>
+                            <span className="text-white font-medium">Dividir Premio</span>
+                            <p className="text-gray-400 text-sm">Todos los que acierten comparten el pozo equitativamente</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Información del modo */}
+                  <div className="bg-green-900/30 border border-green-600/40 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <span className="text-green-400 mr-2 mt-0.5">ℹ️</span>
+                      <div className="text-sm text-green-200">
+                        <p className="font-medium mb-1">Funcionamiento:</p>
+                        <div className="text-green-300 space-y-1">
+                          <p>• Solo las predicciones exactas pueden ganar</p>
+                          <p>• Debe coincidir perfectamente con el resultado</p>
+                          <p>• {exactModeConfig.allowMultipleWinners 
+                              ? 'Si varios aciertan: se divide el premio entre todos' 
+                              : 'Si varios aciertan: gana el primero que predijo'}</p>
+                          <p>• Si nadie acierta: el pozo se devuelve a los participantes</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmación de selección */}
+              {selectedResolutionMode && (
+                <div className="mt-4 p-4 bg-green-600/10 border border-green-600/30 rounded-lg">
+                  <div className="flex items-center text-green-400 mb-2">
+                    <span className="mr-2">✅</span>
+                    <span className="font-medium">Configuración Lista</span>
+                  </div>
+                  <p className="text-gray-300 text-sm">
+                    Has seleccionado <strong>{selectedModality.replace('-', ' ').toUpperCase()}</strong> con resolución <strong>{resolutionModes[selectedModality as keyof typeof resolutionModes].find(m => m.id === selectedResolutionMode)?.name}</strong>.
+                    {selectedResolutionMode === 'MULTI_WINNER' && (
+                      <span> Con {Math.ceil((multiWinnerConfig.winnerPercentage / 100) * multiWinnerConfig.maxParticipants)} ganadores ({multiWinnerConfig.winnerPercentage}% de participantes).</span>
+                    )}
+                    {selectedResolutionMode === 'CLOSEST' && (
+                      <span> Usando {closestModeConfig.proximityType === 'ABSOLUTE' ? 'diferencia absoluta' : 'diferencia porcentual'}.</span>
+                    )}
+                    {selectedResolutionMode === 'EXACT' && (
+                      <span> {exactModeConfig.allowMultipleWinners ? 'Dividiendo premio entre ganadores' : 'Solo primer acierto gana'}.</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Información adicional */}
+          {!selectedModality && (
+            <div className="mt-6 p-4 bg-gray-800/50 border border-gray-600 rounded-lg">
+              <div className="flex items-center mb-2">
+                <span className="text-blue-400 mr-2">💡</span>
+                <span className="text-white font-medium">Tip:</span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                Selecciona la modalidad que mejor se adapte a tu estilo. Battle Royal para mayor emoción y múltiples premios, 
+                Group Balanced para competencia equilibrada, o Simple para retos directos y rápidos.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1171,18 +1943,104 @@ function CreateBetFromSportsContent() {
 
         {/* Panel Central - Configuración Principal */}
         <div className="flex-1 order-2 lg:order-2 min-w-0">
-        {/* Configuración de reto seleccionada */}
+        {/* Configuración de reto seleccionada - Dinámica */}
         <div className="bg-[#2a2d47] rounded-xl p-4 lg:p-5 border border-gray-600 mb-4">
           <div className="flex items-center mb-4">
-            <div className="text-4xl mr-4">{betConfig.icon}</div>
-            <div>
-              <h2 className="text-xl font-semibold text-white">{betConfig.title}</h2>
-              <p className="text-gray-400">{betConfig.description}</p>
+            <div className="text-4xl mr-4">
+              {selectedModality === 'battle-royal' ? '⚔️' : 
+               selectedModality === 'group-balanced' ? '👥' : 
+               selectedModality === 'simple' ? '🎯' : betConfig.icon}
             </div>
-            <div className="ml-auto bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">
-              Configuración Activa
+            <div>
+              <h2 className="text-xl font-semibold text-white">
+                {selectedModality === 'battle-royal' ? 'Battle Royal' : 
+                 selectedModality === 'group-balanced' ? 'Group Balanced' : 
+                 selectedModality === 'simple' ? 'Predicción Simple' : betConfig.title}
+              </h2>
+              <p className="text-gray-400">
+                {selectedModality === 'battle-royal' ? 'Compite contra todos los participantes' : 
+                 selectedModality === 'group-balanced' ? 'Grupos balanceados por habilidad' : 
+                 selectedModality === 'simple' ? 'Reto directo y sencillo' : betConfig.description}
+              </p>
+            </div>
+            <div className={`ml-auto px-3 py-1 rounded-full text-sm ${
+              selectedModality 
+                ? 'bg-green-500/20 text-green-400' 
+                : 'bg-yellow-500/20 text-yellow-400'
+            }`}>
+              {selectedModality ? 'Configuración Activa' : 'Seleccionar Modalidad'}
             </div>
           </div>
+          
+          {/* Información adicional según modalidad */}
+          {selectedModality && (
+            <div className="mt-3 p-3 bg-gray-800/50 rounded-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-400">Modalidad:</div>
+                  <div className="text-white font-medium">
+                    {selectedModality === 'battle-royal' ? 'Battle Royal' : 
+                     selectedModality === 'group-balanced' ? 'Group Balanced' : 
+                     'Predicción Simple'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Resolución:</div>
+                  <div className="text-white font-medium">
+                    {selectedResolutionMode ? 
+                      resolutionModes[selectedModality as keyof typeof resolutionModes].find(m => m.id === selectedResolutionMode)?.name?.replace(/🎯|🔥|🏆|⚖️/g, '').trim() || 'Seleccionar' 
+                      : 'Pendiente'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Participantes:</div>
+                  <div className="text-blue-400 font-semibold">
+                    {basicConfig.maxParticipants} jugadores
+                    {selectedModality === 'group-balanced' && ` (${basicConfig.maxGroups} grupos)`}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Stake:</div>
+                  <div className="text-green-400 font-semibold">
+                    ${basicConfig.betAmount} USDC
+                  </div>
+                </div>
+              </div>
+              
+              {/* Info específica por modalidad */}
+              {selectedModality === 'battle-royal' && selectedResolutionMode === 'MULTI_WINNER' && (
+                <div className="mt-3 pt-3 border-t border-gray-600">
+                  <div className="flex items-center text-purple-400 text-sm">
+                    <span className="mr-2">🏆</span>
+                    <span>
+                      {Math.ceil((multiWinnerConfig.winnerPercentage / 100) * parseInt(basicConfig.maxParticipants))} ganadores 
+                      ({multiWinnerConfig.winnerPercentage}% de participantes)
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {selectedModality === 'group-balanced' && (
+                <div className="mt-3 pt-3 border-t border-gray-600">
+                  <div className="flex items-center text-blue-400 text-sm">
+                    <span className="mr-2">⚖️</span>
+                    <span>
+                      Máximo {Math.ceil(parseInt(basicConfig.maxParticipants) / parseInt(basicConfig.maxGroups))} por grupo
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {selectedModality === 'simple' && (
+                <div className="mt-3 pt-3 border-t border-gray-600">
+                  <div className="flex items-center text-green-400 text-sm">
+                    <span className="mr-2">🎯</span>
+                    <span>Predicción exacta requerida para ganar</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Barra de Filtros Horizontales */}
@@ -1608,61 +2466,120 @@ function CreateBetFromSportsContent() {
                 scrollbarWidth: 'none', 
                 msOverflowStyle: 'none' 
               }}>
-              {/* Apuesta ejemplo 1 */}
-              <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Battle Royal</span>
-                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Activa</span>
-                </div>
-                <div className="text-xs text-gray-400">Total de Goles (Más/Menos)</div>
-                <div className="text-sm text-white">Más de 2.5</div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-400">12/20 participantes</span>
-                  <span className="text-xs text-yellow-400">$50 USDC</span>
-                </div>
-              </div>
+              {/* Ejemplos dinámicos basados en modalidad seleccionada */}
+              {(() => {
+                const getExamples = () => {
+                  const modalityName = selectedModality ? selectedModality.replace('-', ' ').toUpperCase() : 'BATTLE ROYAL';
+                  const modalityColor = selectedModality === 'battle-royal' ? 'red' : 
+                                       selectedModality === 'group-balanced' ? 'blue' : 
+                                       selectedModality === 'simple' ? 'green' : 'red';
+                  const betAmount = basicConfig.betAmount || '50';
+                  const maxParticipants = basicConfig.maxParticipants || '20';
 
-              {/* Apuesta ejemplo 2 */}
-              <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Group Balanced</span>
-                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Llenándose</span>
-                </div>
-                <div className="text-xs text-gray-400">Total de Goles (Más/Menos)</div>
-                <div className="text-sm text-white">Más de 2.5</div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-400">8/15 participantes</span>
-                  <span className="text-xs text-yellow-400">$25 USDC</span>
-                </div>
-              </div>
+                  const baseExamples = [
+                    {
+                      title: modalityName,
+                      status: 'Activa',
+                      statusColor: `bg-green-500/20 text-green-400`,
+                      prediction: 'Total de Goles (Más/Menos)',
+                      result: 'Más de 2.5',
+                      participants: `${Math.floor(parseInt(maxParticipants) * 0.6)}/${maxParticipants}`,
+                      amount: `$${betAmount} USDC`,
+                      border: `border-${modalityColor}-600/30`
+                    },
+                    {
+                      title: modalityName,
+                      status: 'Llenándose',
+                      statusColor: `bg-${modalityColor}-500/20 text-${modalityColor}-400`,
+                      prediction: 'Resultado Final',
+                      result: `${matchData?.teams?.home || 'Local'} gana`,
+                      participants: `${Math.floor(parseInt(maxParticipants) * 0.4)}/${maxParticipants}`,
+                      amount: `$${betAmount} USDC`,
+                      border: `border-gray-600/50`
+                    },
+                    {
+                      title: modalityName,
+                      status: 'Disponible',
+                      statusColor: `bg-yellow-500/20 text-yellow-400`,
+                      prediction: 'Total de Córners',
+                      result: 'Más de 8.5',
+                      participants: `0/${maxParticipants}`,
+                      amount: `$${betAmount} USDC`,
+                      border: `border-gray-600/50`
+                    },
+                    {
+                      title: modalityName,
+                      status: 'Cerrada',
+                      statusColor: `bg-gray-500/20 text-gray-400`,
+                      prediction: 'Ambos Equipos Anotan',
+                      result: selectedModality === 'simple' ? 'No' : 'Sí',
+                      participants: `${maxParticipants}/${maxParticipants}`,
+                      amount: `$${betAmount} USDC`,
+                      border: `border-gray-600/50`
+                    }
+                  ];
 
-              {/* Apuesta ejemplo 3 */}
-              <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Desafío 1v1</span>
-                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">Cerrada</span>
-                </div>
-                <div className="text-xs text-gray-400">Ambos Equipos Anotan</div>
-                <div className="text-sm text-white">Sí</div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-400">2/2 participantes</span>
-                  <span className="text-xs text-yellow-400">$100 USDC</span>
-                </div>
-              </div>
+                  // Ajustes específicos por modalidad
+                  if (selectedModality === 'group-balanced') {
+                    baseExamples[0].participants = `${Math.floor(parseInt(maxParticipants) * 0.6)}/${maxParticipants} (${basicConfig.maxGroups || '5'} grupos)`;
+                    baseExamples[1].participants = `${Math.floor(parseInt(maxParticipants) * 0.4)}/${maxParticipants} (${basicConfig.maxGroups || '5'} grupos)`;
+                    baseExamples[2].participants = `0/${maxParticipants} (${basicConfig.maxGroups || '5'} grupos)`;
+                    baseExamples[3].participants = `${maxParticipants}/${maxParticipants} (${basicConfig.maxGroups || '5'} grupos)`;
+                  } else if (selectedModality === 'simple') {
+                    baseExamples[0].participants = `1/${maxParticipants} participantes`;
+                    baseExamples[1].participants = `1/${maxParticipants} participantes`;
+                    baseExamples[2].participants = `0/${maxParticipants} participantes`;
+                    baseExamples[3].participants = `${maxParticipants}/${maxParticipants} participantes`;
+                    baseExamples[0].prediction = 'Predicción del Creador';
+                    baseExamples[1].prediction = 'Predicción del Creador';
+                    baseExamples[2].prediction = 'Predicción del Creador';
+                    baseExamples[3].prediction = 'Predicción del Creador';
+                  }
 
-              {/* Apuesta ejemplo 4 */}
-              <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">Group Balanced</span>
-                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Activa</span>
-                </div>
-                <div className="text-xs text-gray-400">Total de Córners</div>
-                <div className="text-sm text-white">Más de 6.5</div>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-400">5/15 participantes</span>
-                  <span className="text-xs text-yellow-400">$25 USDC</span>
-                </div>
-              </div>
+                  return baseExamples;
+                };
+
+                return getExamples().map((example, index) => (
+                  <div key={index} className={`bg-gray-700/30 rounded-lg p-3 border ${example.border}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-white">{example.title}</span>
+                      <span className={`text-xs px-2 py-1 rounded ${example.statusColor}`}>
+                        {example.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400">{example.prediction}</div>
+                    <div className="text-sm text-white">{example.result}</div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs text-gray-400">{example.participants}</span>
+                      <span className="text-xs text-yellow-400">{example.amount}</span>
+                    </div>
+                    {selectedResolutionMode === 'MULTI_WINNER' && index === 0 && (
+                      <div className="mt-2 text-xs">
+                        <div className="flex items-center text-purple-400">
+                          <span className="mr-1">🏆</span>
+                          <span>{Math.ceil((multiWinnerConfig.winnerPercentage / 100) * parseInt(basicConfig.maxParticipants))} ganadores ({multiWinnerConfig.winnerPercentage}%)</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedModality === 'group-balanced' && index === 1 && (
+                      <div className="mt-2 text-xs">
+                        <div className="flex items-center text-blue-400">
+                          <span className="mr-1">⚖️</span>
+                          <span>Ganador por grupo</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedModality === 'simple' && index === 2 && basicConfig.title && (
+                      <div className="mt-2 text-xs">
+                        <div className="flex items-center text-green-400">
+                          <span className="mr-1">🎯</span>
+                          <span>Predicción exacta requerida</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ));
+              })()}
             </div>
 
             {/* Estadísticas del evento */}
@@ -1851,6 +2768,124 @@ function CreateBetFromSportsContent() {
         </div>
         </div>
       )}
+
+      {/* Botón Crear Reto */}
+      <div className="w-full px-2 lg:px-4 xl:px-6 py-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Resumen final y validación */}
+          <div className="bg-gray-800/30 border border-gray-600 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+              <span className="mr-2">📋</span>
+              Resumen Final
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
+              <div>
+                <div className="text-gray-400">Tipo de reto:</div>
+                <div className="text-white font-medium">
+                  {selectedModality ? selectedModality.replace('-', ' ').toUpperCase() : 'No seleccionado'}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400">Modo de resolución:</div>
+                <div className="text-white font-medium">
+                  {selectedResolutionMode ? resolutionModes[selectedModality as keyof typeof resolutionModes].find(m => m.id === selectedResolutionMode)?.name || selectedResolutionMode : 'No seleccionado'}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400">Participantes:</div>
+                <div className="text-blue-400 font-semibold">{basicConfig.maxParticipants} jugadores</div>
+              </div>
+              <div>
+                <div className="text-gray-400">Premio total:</div>
+                <div className="text-yellow-400 font-semibold">
+                  ${(parseInt(basicConfig.betAmount || '0') * parseInt(basicConfig.maxParticipants || '0')).toLocaleString()} USDC
+                </div>
+              </div>
+            </div>
+
+            {selectedResolutionMode === 'MULTI_WINNER' && (
+              <div className="bg-purple-900/20 border border-purple-600/30 rounded-lg p-4 mb-4">
+                <div className="text-sm font-medium text-purple-300 mb-2">Distribución Multi-Ganador:</div>
+                <div className="flex flex-wrap gap-2">
+                  {multiWinnerConfig.prizeDistribution.slice(0, 5).map((prize, index) => (
+                    <div key={index} className="bg-purple-900/30 rounded px-2 py-1 text-xs">
+                      {prize.position === 1 ? '🥇' : prize.position === 2 ? '🥈' : prize.position === 3 ? '🥉' : '🏆'} 
+                      <span className="ml-1 text-purple-300">{prize.percentage}%</span>
+                    </div>
+                  ))}
+                  {multiWinnerConfig.prizeDistribution.length > 5 && (
+                    <div className="bg-gray-700 rounded px-2 py-1 text-xs text-gray-400">
+                      +{multiWinnerConfig.prizeDistribution.length - 5} más
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Lista de validación */}
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-300 mb-2">Estado de configuración:</div>
+              {validateConfiguration().length === 0 ? (
+                <div className="flex items-center text-green-400 text-sm">
+                  <span className="mr-2">✅</span>
+                  <span>Configuración completa y lista para crear</span>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {validateConfiguration().map((error, index) => (
+                    <div key={index} className="flex items-center text-red-400 text-sm">
+                      <span className="mr-2">❌</span>
+                      <span>{error}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Botón Crear */}
+          <div className="flex justify-center">
+            <button
+              onClick={() => {
+                if (isConfigurationComplete()) {
+                  console.log('Crear reto con configuración:', {
+                    basicConfig,
+                    selectedModality,
+                    selectedResolutionMode,
+                    multiWinnerConfig,
+                    closestModeConfig,
+                    exactModeConfig,
+                    matchData
+                  });
+                  // Aquí iría la lógica para crear el reto
+                  alert('¡Reto creado exitosamente! (Demo)');
+                } else {
+                  alert('Por favor completa toda la configuración antes de crear el reto');
+                }
+              }}
+              disabled={!isConfigurationComplete()}
+              className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 ${
+                isConfigurationComplete()
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {isConfigurationComplete() ? (
+                <span className="flex items-center">
+                  <span className="mr-2">🚀</span>
+                  Crear Reto
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <span className="mr-2">⚠️</span>
+                  Completar Configuración
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
       
       <Footer />
     </div>

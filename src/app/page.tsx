@@ -6,10 +6,10 @@ import { SportCategory, BettingChallenge, Position, UserProfile, BetType, Resolu
 import { WalletConnection } from '@/components/WalletConnection';
 import UserPanel from '@/components/UserPanel';
 import BetModal from '@/components/BetModal';
-// import OneVsOneModal from '@/components/OneVsOneModal';
+import OneVsOneModal from '@/components/OneVsOneModal';
 import MarketOffersModal from '@/components/MarketOffersModal';
-// import GroupBalancedModal from '@/components/GroupBalancedModal';
-// import TournamentModal from '@/components/TournamentModal';
+import GroupBalancedModal from '@/components/GroupBalancedModal';
+import TournamentModal from '@/components/TournamentModal';
 import BetTypeSelector, { BetTypeOption } from '@/components/BetTypeSelector';
 import CreateBetView from '@/components/CreateBetView';
 import { useBalance } from '@/hooks/useBalance';
