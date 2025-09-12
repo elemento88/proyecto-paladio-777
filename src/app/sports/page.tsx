@@ -462,7 +462,7 @@ export default function SportsPage() {
         {/* Sidebar izquierda - Ligas */}
         <div className={`w-60 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden z-10 transition-all duration-300 ${
           showSidebar ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 lg:fixed lg:top-32 lg:left-4 lg:h-auto absolute`}>
+        } lg:translate-x-0 lg:fixed lg:top-40 lg:left-4 lg:h-auto absolute`}>
           
           {/* Header moderno */}
           <div className="p-4 border-b border-white/10">
