@@ -19,6 +19,7 @@ import TournamentCard from '@/components/TournamentCard';
 import CreateTournamentModal from '@/components/CreateTournamentModal';
 import { useTournaments } from '@/hooks/useTournaments';
 import LiveScores from '@/components/LiveScores';
+import { useSports } from '@/hooks/useSports';
 
 const mockSportsCategories: SportCategory[] = [
   { id: 'todos', name: 'Todos', icon: '🏆', count: 255 },
