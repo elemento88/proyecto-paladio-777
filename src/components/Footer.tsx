@@ -12,9 +12,9 @@ export default function Footer() {
               </div>
               <h3 className="text-2xl font-bold text-white">Paladio 77</h3>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed mb-4 max-w-md">
-              La plataforma de apuestas deportivas descentralizada más avanzada. 
-              Apuesta con seguridad, transparencia y pagos instantáneos en blockchain.
+            <p className="text-gray-300 text-sm leading-relaxed mb-6 max-w-md">
+              Plataforma de retos deportivos descentralizada líder en Web3. 
+              Apuesta con total transparencia, seguridad blockchain y pagos instantáneos.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-blue-400 transition-colors">
@@ -39,9 +39,9 @@ export default function Footer() {
           <div>
             <h4 className="text-white font-semibold text-sm uppercase tracking-wide mb-4">Plataforma</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">Deportes</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">En Vivo</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">Crear Apuesta</a></li>
+              <li><a href="/sports" className="text-gray-300 hover:text-white transition-colors text-sm">Deportes</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">Crear Reto</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">Mis Retos</a></li>
               <li><a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">Estadísticas</a></li>
             </ul>
           </div>
@@ -85,7 +85,7 @@ export default function Footer() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
                 </svg>
               </div>
-              <span className="text-sm font-medium">Descentralizado</span>
+              <span className="text-sm font-medium">100% Descentralizado</span>
             </div>
 
             <div className="flex items-center space-x-3 text-gray-300">
@@ -94,7 +94,7 @@ export default function Footer() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
               </div>
-              <span className="text-sm font-medium">Transparente</span>
+              <span className="text-sm font-medium">Totalmente Verificable</span>
             </div>
           </div>
         </div>
@@ -103,10 +103,10 @@ export default function Footer() {
         <div className="border-t border-gray-600 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-gray-400 text-sm">
-              © 2024 Paladio 77. Todos los derechos reservados.
+              © 2024 Paladio 77. Plataforma de retos deportivos descentralizada.
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
-              <span>Licencia: Curaçao eGaming</span>
+              <span>Web3 Enabled</span>
               <span>•</span>
               <span>SSL Certificado</span>
               <span>•</span>
