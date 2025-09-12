@@ -742,7 +742,7 @@ export default function ChallengePage({ id }: ChallengeDetailProps) {
                           </div>
                           <div className="bg-purple-500/10 border border-purple-500/20 rounded px-2 py-1">
                             <span className="text-gray-400">1er Gol:</span>
-                            <span className="text-purple-400 font-medium ml-1">{participant.bet.predictions.first_goal_min}'</span>
+                            <span className="text-purple-400 font-medium ml-1">{participant.bet.predictions.first_goal_min}&apos;</span>
                           </div>
                         </div>
                       </div>
@@ -799,10 +799,10 @@ export default function ChallengePage({ id }: ChallengeDetailProps) {
                 <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3">
                   <div className="text-purple-400 text-sm font-medium mb-1">Primer Gol</div>
                   <div className="text-white font-bold text-lg">
-                    {participants.length > 0 ? (participants.reduce((sum, p) => sum + (p.bet?.predictions?.first_goal_min || 0), 0) / participants.length).toFixed(0) : '0'}'
+                    {participants.length > 0 ? (participants.reduce((sum, p) => sum + (p.bet?.predictions?.first_goal_min || 0), 0) / participants.length).toFixed(0) : '0'}&apos;
                   </div>
                   <div className="text-gray-400 text-xs">
-                    Rango: {participants.length > 0 ? Math.min(...participants.map(p => p.bet?.predictions?.first_goal_min || 0)) : 0}' - {participants.length > 0 ? Math.max(...participants.map(p => p.bet?.predictions?.first_goal_min || 0)) : 0}'
+                    Rango: {participants.length > 0 ? Math.min(...participants.map(p => p.bet?.predictions?.first_goal_min || 0)) : 0}&apos; - {participants.length > 0 ? Math.max(...participants.map(p => p.bet?.predictions?.first_goal_min || 0)) : 0}&apos;
                   </div>
                 </div>
               </div>

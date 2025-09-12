@@ -79,10 +79,98 @@ export default function UserPanel({ username }: UserPanelProps) {
   const { balance, transactions, isLoading, addTransaction, updateBalance } = useBalance();
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [userBets, setUserBets] = useState<UserBet[]>(mockUserBets);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [expandedStats, setExpandedStats] = useState(false);
+  const [notifications, setNotifications] = useState<{id: string, type: 'success' | 'info' | 'warning', message: string}[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   // Función para agregar un nuevo reto a la lista de posiciones
   const addUserBet = (bet: UserBet) => {
     setUserBets(prev => [bet, ...prev]);
+  };
+
+  // Función para refrescar datos
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // Simular llamada a API
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsRefreshing(false);
+    addNotification('success', '✅ Datos actualizados exitosamente');
+  };
+
+  // Función para agregar notificaciones
+  const addNotification = (type: 'success' | 'info' | 'warning', message: string) => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { id, type, message }]);
+    // Auto-remove después de 3 segundos
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 3000);
+  };
+
+  // Auto-refresh cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isRefreshing) {
+        addNotification('info', '📊 Datos actualizados automáticamente');
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isRefreshing]);
+
+  // Función para buscar retos por evento/partido
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Simular búsqueda de retos
+    const mockResults = [
+      {
+        id: '1',
+        title: 'Real Madrid vs Barcelona',
+        league: 'La Liga',
+        betAmount: '$100',
+        participants: 15,
+        timeLeft: '2h 30m',
+        sport: 'Fútbol',
+        status: 'active'
+      },
+      {
+        id: '2', 
+        title: 'Lakers vs Warriors',
+        league: 'NBA',
+        betAmount: '$75',
+        participants: 8,
+        timeLeft: '1h 45m',
+        sport: 'Baloncesto',
+        status: 'active'
+      },
+      {
+        id: '3',
+        title: 'Chiefs vs Ravens',
+        league: 'NFL',
+        betAmount: '$200',
+        participants: 22,
+        timeLeft: '4h 15m',
+        sport: 'Fútbol Americano',
+        status: 'active'
+      }
+    ];
+
+    // Filtrar resultados por el query
+    const filtered = mockResults.filter(result => 
+      result.title.toLowerCase().includes(query.toLowerCase()) ||
+      result.league.toLowerCase().includes(query.toLowerCase()) ||
+      result.sport.toLowerCase().includes(query.toLowerCase())
+    );
+
+    setSearchResults(filtered);
+    addNotification('info', `🔍 ${filtered.length} retos encontrados`);
   };
 
   // Simular agregar el reto de desafío múltiple si el usuario se unió
@@ -206,17 +294,43 @@ export default function UserPanel({ username }: UserPanelProps) {
 
   return (
     <div className="w-80 bg-[#1a1d29] border-l border-gray-700 p-4 flex flex-col">
+      {/* Imagen m12 */}
+      <div className="mb-4 flex justify-center">
+        <img 
+          src="/m12.png" 
+          alt="M12 Logo" 
+          width={150} 
+          height={75} 
+          className="drop-shadow-lg"
+          style={{
+            objectFit: 'contain',
+            background: 'transparent'
+          }}
+        />
+      </div>
+
       {/* Header del usuario con balance */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-white">Mis Posiciones</h2>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center mr-2 shadow-md">
-              <span className="text-white font-bold text-sm">P</span>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-white">{username}</div>
-            </div>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-lg font-semibold text-white">Mis Posiciones</h2>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={`p-1 rounded-full transition-all hover:bg-gray-700 ${
+                isRefreshing ? 'animate-spin' : 'hover:scale-110'
+              }`}
+            >
+              <span className="text-sm">🔄</span>
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowQuickActions(!showQuickActions)}
+              className="p-1 rounded-full hover:bg-gray-700 transition-all hover:scale-110"
+            >
+              <span className="text-sm">⚡</span>
+            </button>
           </div>
         </div>
         <p className="text-gray-400 text-sm mb-3">Gestiona tus retos activos</p>
@@ -245,10 +359,64 @@ export default function UserPanel({ username }: UserPanelProps) {
             <span className="text-blue-400 font-medium">${mockUserBalance.pendingRewards}</span>
           </div>
         </div>
+
+        {/* Panel de acciones rápidas */}
+        {showQuickActions && (
+          <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg p-3 mb-4 border border-blue-600/30 animate-fadeIn">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center">
+              <span className="mr-2">⚡</span>
+              Acciones Rápidas
+            </h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button 
+                onClick={() => addNotification('info', '🎯 Creando reto rápido...')}
+                className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 py-2 px-3 rounded transition-all hover:scale-105"
+              >
+                🎯 Reto Rápido
+              </button>
+              <button 
+                onClick={() => addNotification('info', '💰 Abriendo depósito...')}
+                className="bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-3 rounded transition-all hover:scale-105"
+              >
+                💰 Depositar
+              </button>
+              <button 
+                onClick={() => addNotification('info', '📊 Generando reporte...')}
+                className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 py-2 px-3 rounded transition-all hover:scale-105"
+              >
+                📊 Reporte
+              </button>
+              <button 
+                onClick={() => addNotification('warning', '⚙️ Configuraciones proximamente...')}
+                className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-400 py-2 px-3 rounded transition-all hover:scale-105"
+              >
+                ⚙️ Config
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Notificaciones */}
+      {notifications.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 space-y-2">
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={`p-3 rounded-lg shadow-lg border animate-slideIn ${
+                notification.type === 'success' ? 'bg-green-900/90 border-green-600 text-green-200' :
+                notification.type === 'warning' ? 'bg-yellow-900/90 border-yellow-600 text-yellow-200' :
+                'bg-blue-900/90 border-blue-600 text-blue-200'
+              }`}
+            >
+              <div className="text-sm font-medium">{notification.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Tabs de navegación */}
-      <div className="flex mb-6 bg-gray-700 rounded-lg p-1">
+      <div className="flex justify-start mb-6 bg-gray-700 rounded-lg p-1">
         {[
           { key: 'posiciones', label: '📈', name: 'Posiciones' },
           { key: 'historial', label: '🕐', name: 'Historial' },
@@ -256,11 +424,14 @@ export default function UserPanel({ username }: UserPanelProps) {
         ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setSelectedTab(tab.key as any)}
-            className={`flex-1 py-2 px-2 rounded-md text-xs font-medium capitalize transition-colors ${
+            onClick={() => {
+              setSelectedTab(tab.key as any);
+              addNotification('info', `📊 Cambiando a ${tab.name}`);
+            }}
+            className={`py-2 px-3 rounded-md text-xs font-medium capitalize transition-all hover:scale-105 ${
               selectedTab === tab.key
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'text-gray-400 hover:text-white hover:bg-gray-600/50'
             }`}
           >
             {tab.label} {tab.name}
@@ -273,25 +444,14 @@ export default function UserPanel({ username }: UserPanelProps) {
         {selectedTab === 'posiciones' && (
           <div className="space-y-3">
             {userBets.length === 0 ? (
-              // Estado vacío cuando no hay posiciones
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">📈</span>
+                <div className="w-16 h-16 bg-gray-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">📊</span>
                 </div>
-                <h3 className="text-white font-medium mb-2">Sin posiciones activas</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  Tus retos creados y en los que participes aparecerán aquí
+                <h3 className="text-white font-medium mb-2">No hay posiciones activas</h3>
+                <p className="text-gray-400 text-sm">
+                  Únete a retos para ver tus posiciones aquí
                 </p>
-                <div className="space-y-2 text-xs text-gray-500">
-                  <div className="flex items-center justify-center">
-                    <span className="mr-2">🎯</span>
-                    <span>Únete a retos existentes</span>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <span className="mr-2">➕</span>
-                    <span>Crea nuevos retos</span>
-                  </div>
-                </div>
               </div>
             ) : (
               // Lista de posiciones cuando hay retos
@@ -395,26 +555,56 @@ export default function UserPanel({ username }: UserPanelProps) {
 
         {selectedTab === 'analytics' && (
           <div className="space-y-4">
-            <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
-              <h3 className="text-white font-semibold mb-3">📊 Estadísticas</h3>
+            <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600 hover:border-blue-600/50 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold flex items-center">
+                  <span className="mr-2">📊</span>
+                  Estadísticas
+                </h3>
+                <button
+                  onClick={() => setExpandedStats(!expandedStats)}
+                  className="text-blue-400 hover:text-blue-300 transition-all hover:scale-110"
+                >
+                  {expandedStats ? '🔼' : '🔽'}
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="text-center">
+                <div className="text-center p-3 bg-gray-800/50 rounded hover:bg-gray-700/50 transition-all cursor-pointer">
                   <div className="text-white text-lg font-bold">{mockUserStats.totalBets}</div>
                   <div className="text-gray-400">Total</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center p-3 bg-gray-800/50 rounded hover:bg-gray-700/50 transition-all cursor-pointer">
                   <div className="text-green-400 text-lg font-bold">{mockUserStats.winRate}%</div>
                   <div className="text-gray-400">Win Rate</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center p-3 bg-gray-800/50 rounded hover:bg-gray-700/50 transition-all cursor-pointer">
                   <div className="text-blue-400 text-lg font-bold">{mockUserStats.activeBets}</div>
                   <div className="text-gray-400">Activas</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center p-3 bg-gray-800/50 rounded hover:bg-gray-700/50 transition-all cursor-pointer">
                   <div className="text-purple-400 text-lg font-bold">{mockUserStats.currentStreak}</div>
                   <div className="text-gray-400">Racha</div>
                 </div>
               </div>
+
+              {expandedStats && (
+                <div className="mt-4 pt-4 border-t border-gray-600 animate-fadeIn">
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    <div className="flex justify-between p-2 bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded">
+                      <span className="text-gray-400">Apuestas Ganadas</span>
+                      <span className="text-green-400 font-bold">{mockUserStats.wonBets}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-gradient-to-r from-red-900/20 to-pink-900/20 rounded">
+                      <span className="text-gray-400">Apuestas Perdidas</span>
+                      <span className="text-red-400 font-bold">{mockUserStats.lostBets}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 rounded">
+                      <span className="text-gray-400">Mejor Racha</span>
+                      <span className="text-yellow-400 font-bold">{mockUserStats.bestStreak}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
@@ -454,6 +644,14 @@ export default function UserPanel({ username }: UserPanelProps) {
                 </div>
               </div>
             </div>
+
+            {/* Botón de acción para generar reporte */}
+            <button
+              onClick={() => addNotification('success', '📄 Reporte completo generado exitosamente')}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-lg font-medium transition-all hover:scale-105 hover:shadow-lg interactive-hover"
+            >
+              📄 Generar Reporte Completo
+            </button>
           </div>
         )}
       </div>

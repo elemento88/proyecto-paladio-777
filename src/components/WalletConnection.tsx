@@ -59,8 +59,8 @@ export const WalletConnection: React.FC = () => {
 
       {/* Información del usuario */}
       <div className="flex items-center">
-        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
-          <span className="text-white font-bold">
+        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+          <span className="text-white font-bold text-xl">
             {account ? account.charAt(2).toUpperCase() : 'U'}
           </span>
         </div>

@@ -161,7 +161,7 @@ async function getTheSportsDbEvents(): Promise<LiveScore[]> {
 
 // Función para obtener datos sintéticos masivos (fallback)
 function getMassiveSyntheticEvents(): LiveScore[] {
-  const sports = ['Fútbol', 'Baloncesto', 'Tenis', 'Béisbol', 'Fútbol Americano', 'Boxeo', 'MMA']
+  const sports = ['Fútbol', 'Baloncesto', 'Béisbol', 'Fútbol Americano']
   const leagues = {
     'Fútbol': [
       'Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 
@@ -170,11 +170,8 @@ function getMassiveSyntheticEvents(): LiveScore[] {
       'Eliminatorias CAF', 'Copa América', 'Eurocopa', 'Liga de Naciones'
     ],
     'Baloncesto': ['NBA', 'EuroLeague', 'ACB', 'NCAA', 'FIBA'],
-    'Tenis': ['ATP Tour', 'WTA Tour', 'Grand Slam', 'Masters 1000'],
     'Béisbol': ['MLB', 'NPB', 'KBO', 'LMB'],
-    'Fútbol Americano': ['NFL', 'NCAA', 'CFL', 'XFL'],
-    'Boxeo': ['WBC', 'WBA', 'IBF', 'WBO'],
-    'MMA': ['UFC', 'Bellator', 'ONE Championship', 'PFL']
+    'Fútbol Americano': ['NFL', 'NCAA', 'CFL', 'XFL']
   }
   
   const teams = {
@@ -202,11 +199,8 @@ function getMassiveSyntheticEvents(): LiveScore[] {
       'Camerún', 'Costa de Marfil', 'Mali', 'Burkina Faso', 'Sudáfrica'
     ],
     'Baloncesto': ['Lakers', 'Warriors', 'Celtics', 'Heat', 'Bucks', 'Nets', 'Suns', 'Clippers', 'Spurs', 'Nuggets'],
-    'Tenis': ['Djokovic', 'Nadal', 'Federer', 'Alcaraz', 'Medvedev', 'Tsitsipas', 'Swiatek', 'Rybakina'],
     'Béisbol': ['Yankees', 'Red Sox', 'Dodgers', 'Giants', 'Astros', 'Mets', 'Cardinals', 'Cubs'],
-    'Fútbol Americano': ['Chiefs', 'Bills', 'Bengals', 'Ravens', 'Cowboys', 'Eagles', '49ers', 'Packers'],
-    'Boxeo': ['Canelo Alvarez', 'Tyson Fury', 'Anthony Joshua', 'Gervonta Davis', 'Ryan Garcia', 'Deontay Wilder'],
-    'MMA': ['Jon Jones', 'Islam Makhachev', 'Alexander Volkanovski', 'Leon Edwards', 'Aljamain Sterling', 'Israel Adesanya']
+    'Fútbol Americano': ['Chiefs', 'Bills', 'Bengals', 'Ravens', 'Cowboys', 'Eagles', '49ers', 'Packers']
   }
 
   const events: LiveScore[] = []
@@ -238,6 +232,10 @@ function getMassiveSyntheticEvents(): LiveScore[] {
       const hour = 10 + Math.floor(Math.random() * 12) // Entre 10:00 y 22:00
       const minute = [0, 15, 30, 45][Math.floor(Math.random() * 4)]
       const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      
+      // Crear fecha completa con hora específica
+      const fullEventDate = new Date(eventDate)
+      fullEventDate.setHours(hour, minute, 0, 0)
 
       events.push({
         id: `synthetic-${eventId++}`,
@@ -248,7 +246,7 @@ function getMassiveSyntheticEvents(): LiveScore[] {
         homeScore: null,
         awayScore: null,
         status: dayOffset === 0 && Math.random() < 0.2 ? 'En vivo' : 'Programado',
-        date: dateString,
+        date: fullEventDate.toISOString(), // Fecha completa con hora
         time,
         venue: `${sport} Arena ${Math.floor(Math.random() * 100)}`
       })

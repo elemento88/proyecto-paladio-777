@@ -271,8 +271,8 @@ export interface BaseballGame {
 // Generic API Response types
 export interface ApiResponse<T> {
   get: string
-  parameters: Record<string, any>
-  errors: any[]
+  parameters: Record<string, unknown>
+  errors: unknown[]
   results: number
   paging: {
     current: number

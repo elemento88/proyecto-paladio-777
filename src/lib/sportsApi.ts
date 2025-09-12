@@ -3,10 +3,6 @@ import {
   Fixture, 
   League, 
   Team, 
-  BasketballGame, 
-  AmericanFootballGame, 
-  HockeyGame, 
-  BaseballGame,
   LiveScore,
   Odds,
   MatchStatistics,
@@ -25,12 +21,23 @@ const API_CONFIG = {
 // Helper function to make API calls
 async function apiCall<T>(endpoint: string): Promise<ApiResponse<T> | null> {
   try {
+    // Check rate limiter first
+    if (!RateLimiter.canMakeRequest()) {
+      console.warn('Rate limit reached, skipping API call')
+      return null
+    }
+
     const response = await fetch(`${API_CONFIG.baseUrl}${endpoint}`, {
       method: 'GET',
       headers: API_CONFIG.headers
     })
 
     if (!response.ok) {
+      // Handle rate limit error specifically
+      if (response.status === 429) {
+        console.warn('API rate limit exceeded (429), using mock data')
+        return null
+      }
       throw new Error(`API call failed: ${response.status} ${response.statusText}`)
     }
 
@@ -202,7 +209,6 @@ export class FootballAPI {
 class MockDataGenerator {
   static generateTodaysFixtures(): LiveScore[] {
     const today = new Date()
-    const todayStr = today.toISOString()
     
     return [
       // Premier League
@@ -255,6 +261,30 @@ class MockDataGenerator {
         time: 'VS',
         date: new Date(today.getTime() + 8 * 60 * 60 * 1000).toISOString()
       },
+      {
+        id: 1007,
+        sport: 'football',
+        league: 'La Liga',
+        homeTeam: 'Real Betis',
+        awayTeam: 'Sevilla',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 10 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 1008,
+        sport: 'football',
+        league: 'La Liga',
+        homeTeam: 'Real Sociedad',
+        awayTeam: 'Rayo Vallecano',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 12 * 60 * 60 * 1000).toISOString()
+      },
       // Serie A
       {
         id: 1005,
@@ -268,6 +298,18 @@ class MockDataGenerator {
         time: 'VS',
         date: new Date(today.getTime() + 5 * 60 * 60 * 1000).toISOString()
       },
+      {
+        id: 1009,
+        sport: 'football',
+        league: 'Serie A',
+        homeTeam: 'Roma',
+        awayTeam: 'Inter Milan',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 14 * 60 * 60 * 1000).toISOString()
+      },
       // Bundesliga
       {
         id: 1006,
@@ -280,6 +322,43 @@ class MockDataGenerator {
         status: 'Not Started',
         time: 'VS',
         date: new Date(today.getTime() + 7 * 60 * 60 * 1000).toISOString()
+      },
+      // NBA
+      {
+        id: 2001,
+        sport: 'basketball',
+        league: 'NBA',
+        homeTeam: 'Lakers',
+        awayTeam: 'Warriors',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 6 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 2002,
+        sport: 'basketball',
+        league: 'NBA',
+        homeTeam: 'Bulls',
+        awayTeam: 'Celtics',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 8 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        id: 2003,
+        sport: 'basketball',
+        league: 'NBA',
+        homeTeam: 'Raptors',
+        awayTeam: 'Heat',
+        homeScore: null,
+        awayScore: null,
+        status: 'Not Started',
+        time: 'VS',
+        date: new Date(today.getTime() + 10 * 60 * 60 * 1000).toISOString()
       }
     ]
   }
@@ -338,15 +417,19 @@ export class SportsAPI {
   // Get live scores for all sports
   static async getLiveScores(): Promise<LiveScore[]> {
     try {
+      // Siempre usar datos mock para garantizar disponibilidad
+      const mockData = MockDataGenerator.generateLiveScores()
+      console.log('🔴 Mock live scores generated:', mockData.length)
+      
       // Try to get real data first
       const footballFixtures = await FootballAPI.getLiveFixtures()
       
       if (footballFixtures.length === 0) {
         console.info('No real API data available, using mock live scores')
-        return MockDataGenerator.generateLiveScores()
+        return mockData
       }
       
-      const liveScores: LiveScore[] = footballFixtures.map(fixture => ({
+      const realData: LiveScore[] = footballFixtures.map(fixture => ({
         id: fixture.id,
         sport: 'football',
         league: fixture.league.name,
@@ -359,10 +442,13 @@ export class SportsAPI {
         date: fixture.date
       }))
 
-      return liveScores
+      // Combinar datos reales con mock
+      return [...realData, ...mockData]
     } catch (error) {
       console.error('Error fetching live scores:', error)
-      return MockDataGenerator.generateLiveScores()
+      const mockData = MockDataGenerator.generateLiveScores()
+      console.log('🔄 Fallback to mock live scores:', mockData.length)
+      return mockData
     }
   }
 
@@ -370,14 +456,21 @@ export class SportsAPI {
   static async getTodaysFixtures(): Promise<LiveScore[]> {
     try {
       const today = new Date().toISOString().split('T')[0]
+      
+      // Intentar obtener datos reales de la API
       const footballFixtures = await FootballAPI.getFixturesByDate(today)
+      
+      // Siempre usar datos mock para garantizar que hay datos disponibles para la búsqueda
+      const mockData = MockDataGenerator.generateTodaysFixtures()
+      console.log('📊 Mock data generated:', mockData.length, 'fixtures')
       
       if (footballFixtures.length === 0) {
         console.info('No real API data available, using mock fixtures for today')
-        return MockDataGenerator.generateTodaysFixtures()
+        return mockData
       }
       
-      const todaysFixtures: LiveScore[] = footballFixtures.map(fixture => ({
+      // Combinar datos reales con mock data
+      const realData: LiveScore[] = footballFixtures.map(fixture => ({
         id: fixture.id,
         sport: 'football',
         league: fixture.league.name,
@@ -390,10 +483,13 @@ export class SportsAPI {
         date: fixture.date
       }))
 
-      return todaysFixtures
+      // Devolver datos reales + mock para máxima disponibilidad
+      return [...realData, ...mockData]
     } catch (error) {
       console.error('Error fetching today\'s fixtures:', error)
-      return MockDataGenerator.generateTodaysFixtures()
+      const mockData = MockDataGenerator.generateTodaysFixtures()
+      console.log('🔄 Fallback to mock data:', mockData.length, 'fixtures')
+      return mockData
     }
   }
 

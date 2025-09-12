@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react';
-import Link from 'next/link';
 import BackButton from '@/components/BackButton';
-import { BettingChallenge, Transaction, UserStats } from '@/types/betting';
+import { BettingChallenge, Transaction } from '@/types/betting';
 
 // Mock data para el dashboard administrativo
 const mockAdminStats = {
@@ -163,7 +162,7 @@ export default function AdminDashboard() {
             ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setSelectedTab(tab.key as any)}
+                onClick={() => setSelectedTab(tab.key as 'overview' | 'bets' | 'users' | 'transactions')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   selectedTab === tab.key
                     ? 'bg-blue-600 text-white'

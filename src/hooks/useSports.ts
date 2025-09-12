@@ -18,6 +18,7 @@ import {
 } from '@/lib/theSportsDbApi'
 import { getCurrentFootballMatches } from '@/lib/footballApi'
 import { getMassiveSportsEvents } from '@/lib/massiveSportsApi'
+import { UnifiedSportsAPI } from '@/lib/unifiedSportsApi'
 
 interface UseSportsReturn {
   // Data states
@@ -116,44 +117,56 @@ export function useSports(): UseSportsReturn {
       setLoadingFixtures(true)
       setError(null)
       
-      console.log('🚀 Cargando eventos deportivos masivos...')
+      console.log('🚀 Cargando eventos deportivos usando UnifiedSportsAPI...')
       
-      // Obtener eventos masivos de múltiples deportes y APIs
-      let fixtures = await getMassiveSportsEvents()
+      // Usar únicamente UnifiedSportsAPI para evitar errores 403/429
+      const fixtures = await UnifiedSportsAPI.getAllEvents()
       
-      // Fallback a APIs individuales si es necesario
-      if (fixtures.length < 50) {
-        console.info('Pocos eventos masivos, intentando APIs individuales...')
-        
-        const footballFixtures = await getCurrentFootballMatches()
-        const theSportsDbFixtures = await FreeSportsAPI.getTodaysFixtures()
-        
-        fixtures = [...fixtures, ...footballFixtures, ...theSportsDbFixtures]
-      }
-      
-      // Último fallback si hay muy pocos eventos
-      if (fixtures.length < 20 && RateLimiter.canMakeRequest()) {
-        console.info('Usando API de fallback para más eventos...')
-        const fallbackFixtures = await SportsAPI.getTodaysFixtures()
-        fixtures = [...fixtures, ...fallbackFixtures]
-        updateRateLimit()
-      }
-      
-      // Eliminar duplicados por ID
-      const uniqueFixtures = fixtures.filter((fixture, index, self) => 
-        index === self.findIndex(f => f.id === fixture.id)
-      )
-      
-      console.log(`✅ Total de eventos únicos cargados: ${uniqueFixtures.length}`)
-      setTodaysFixtures(uniqueFixtures)
+      console.log(`✅ Total de eventos cargados desde UnifiedSportsAPI: ${fixtures.length}`)
+      setTodaysFixtures(fixtures)
       
     } catch (err) {
-      setError('Failed to fetch massive sports events')
-      console.error('Error fetching massive sports events:', err)
+      setError('Failed to fetch sports events')
+      console.error('Error fetching sports events:', err)
+      
+      // Fallback a datos básicos si falla
+      try {
+        console.log('🔄 Usando datos de fallback...')
+        const fallbackEvents = [
+          {
+            id: 8001,
+            sport: 'football',
+            league: 'La Liga',
+            homeTeam: 'Real Madrid',
+            awayTeam: 'Barcelona',
+            homeScore: null,
+            awayScore: null,
+            status: 'Not Started',
+            time: 'VS',
+            date: new Date().toISOString()
+          },
+          {
+            id: 8002,
+            sport: 'basketball',
+            league: 'NBA',
+            homeTeam: 'Lakers',
+            awayTeam: 'Warriors',
+            homeScore: null,
+            awayScore: null,
+            status: 'Not Started',
+            time: 'VS',
+            date: new Date().toISOString()
+          }
+        ]
+        setTodaysFixtures(fallbackEvents)
+      } catch (fallbackErr) {
+        console.error('Error with fallback data:', fallbackErr)
+        setTodaysFixtures([])
+      }
     } finally {
       setLoadingFixtures(false)
     }
-  }, [updateRateLimit])
+  }, [])
 
   // Fetch leagues
   const fetchLeagues = useCallback(async (season: number = new Date().getFullYear()) => {

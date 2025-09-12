@@ -2,29 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { SportCategory, BettingChallenge, Position, UserProfile, BetType, ResolutionMode, OneVsOneMode } from '@/types/betting';
-import { WalletConnection } from '@/components/WalletConnection';
+import { SportCategory, BettingChallenge, UserProfile, BetType, ResolutionMode } from '@/types/betting';
 import UserPanel from '@/components/UserPanel';
 import BetModal from '@/components/BetModal';
-import OneVsOneModal from '@/components/OneVsOneModal';
 import MarketOffersModal from '@/components/MarketOffersModal';
-import GroupBalancedModal from '@/components/GroupBalancedModal';
-import TournamentModal from '@/components/TournamentModal';
 import BetTypeSelector, { BetTypeOption } from '@/components/BetTypeSelector';
 import CreateBetView from '@/components/CreateBetView';
 import { useBalance } from '@/hooks/useBalance';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks/useAuth';
 import { useBetting } from '@/hooks/useBetting';
-import AuthModal from '@/components/AuthModal';
+import { useChallenges } from '@/contexts/ChallengesContext';
 import BotManager from '@/components/BotManager';
 import BotSimulator from '@/components/BotSimulator';
-import LoginButton from '@/components/LoginButton';
 import TournamentCard from '@/components/TournamentCard';
 import CreateTournamentModal from '@/components/CreateTournamentModal';
 import { useTournaments } from '@/hooks/useTournaments';
 import LiveScores from '@/components/LiveScores';
-import { useSports } from '@/hooks/useSports';
 
 const mockSportsCategories: SportCategory[] = [
   { id: 'todos', name: 'Todos', icon: '🏆', count: 255 },
@@ -375,8 +369,8 @@ const mockChallenges: BettingChallenge[] = [
 
 
 const mockUser: UserProfile = {
-  username: '77paladio',
-  network: 'Polygon Amoy Testnet',
+  username: 'Usuario',
+  network: '',
   balance: '$1,250.00 USDC',
   gasPrice: '25 Gwei'
 };
@@ -388,8 +382,6 @@ export default function Home() {
   const { tournaments, activeTournaments, runningTournaments } = useTournaments()
   const { sports, todaysFixtures, liveScores, loading: sportsLoading, error: sportsError } = useSports()
   
-  const [selectedSport, setSelectedSport] = useState('todos');
-  const [selectedLeague, setSelectedLeague] = useState('todas');
   const [mainTab, setMainTab] = useState('retos'); // puede ser 'retos', 'crear' o 'configurar'
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
@@ -410,13 +402,17 @@ export default function Home() {
   // const [showTournamentModal, setShowTournamentModal] = useState(false);
   const [showBetTypeSelector, setShowBetTypeSelector] = useState(false);
   const [selectedBetType, setSelectedBetType] = useState<BetTypeOption | null>(null);
-  const [activeChallenges, setActiveChallenges] = useState(mockChallenges);
+  const { challenges: activeChallenges, setChallenges: setActiveChallenges, addChallenge } = useChallenges();
   const { addTransaction, updateBalance } = useBalance();
 
-  // Resetear liga seleccionada cuando cambia el deporte
+  // Inicializar los retos mock cuando no hay retos en el contexto
   useEffect(() => {
-    setSelectedLeague('todas');
-  }, [selectedSport]);
+    if (activeChallenges.length === 0) {
+      setActiveChallenges(mockChallenges);
+    }
+  }, []);
+
+  // Resetear liga seleccionada cuando cambia el deporte
 
   // Estados para la configuración de reto
   const [selectedBetTypeCard, setSelectedBetTypeCard] = useState<any>(null);
@@ -572,7 +568,7 @@ export default function Home() {
     // Actualizar balance
     updateBalance(-parseFloat(betData.stake), 'bet');
 
-    setActiveChallenges([newChallenge, ...activeChallenges]);
+    addChallenge(newChallenge);
     setShowCreateModal(false);
   };
 
@@ -607,7 +603,7 @@ export default function Home() {
       iconBg: 'bg-purple-500'
     };
 
-    setActiveChallenges([...activeChallenges, newChallenge]);
+    addChallenge(newChallenge);
     // setShowTournamentModal(false);
     
     addTransaction({
@@ -658,7 +654,7 @@ export default function Home() {
       iconBg: 'bg-blue-500'
     };
 
-    setActiveChallenges([...activeChallenges, newChallenge]);
+    addChallenge(newChallenge);
     // setShowGroupBalancedModal(false);
     
     addTransaction({
@@ -724,7 +720,7 @@ export default function Home() {
     // Actualizar balance
     updateBalance(-challengeData.stake, 'bet');
 
-    setActiveChallenges([newChallenge, ...activeChallenges]);
+    addChallenge(newChallenge);
     // setShowOneVsOneModal(false);
   };
 
@@ -954,53 +950,9 @@ export default function Home() {
     return counts;
   };
 
-  // Función para filtrar retos por deporte y liga seleccionados
+  // Función para obtener todos los retos - simplificada
   const getFilteredChallenges = () => {
-    let challenges = activeChallenges;
-
-    // Filtrar por deporte
-    if (selectedSport !== 'todos') {
-      const sportMapping: { [key: string]: string[] } = {
-        'futbol': ['Fútbol'],
-        'baloncesto': ['Baloncesto'],
-        'tenis': ['Tenis'],
-        'beisbol': ['Béisbol'],
-        'futbol-americano': ['Fútbol Americano'],
-        'golf': ['Golf'],
-        'hockey': ['Hockey'],
-        'rugby': ['Rugby'],
-        'voleibol': ['Voleibol']
-      };
-
-      const sportNames = sportMapping[selectedSport] || [];
-      challenges = challenges.filter(challenge => 
-        sportNames.includes(challenge.sport)
-      );
-    }
-
-    // Filtrar por liga
-    if (selectedLeague !== 'todas') {
-      const leagueMapping: { [key: string]: string[] } = {
-        'premier-league': ['Premier League'],
-        'la-liga': ['Liga Española', 'La Liga'],
-        'serie-a': ['Serie A'],
-        'bundesliga': ['Bundesliga'],
-        'champions-league': ['Champions League'],
-        'nba': ['NBA'],
-        'euroleague': ['EuroLeague'],
-        'atp-tour': ['ATP Masters', 'ATP'],
-        'wta-tour': ['WTA'],
-        'nfl': ['NFL'],
-        'mlb': ['MLB']
-      };
-
-      const leagueNames = leagueMapping[selectedLeague] || [];
-      challenges = challenges.filter(challenge => 
-        leagueNames.includes(challenge.league)
-      );
-    }
-
-    return challenges;
+    return activeChallenges;
   };
 
   // Obtener contadores dinámicos y retos filtrados
@@ -1013,108 +965,23 @@ export default function Home() {
     count: sportCounts[sport.id] || 0
   }));
 
-  // Filtrar ligas según el deporte seleccionado
-  const getFilteredLeagues = () => {
-    if (selectedSport === 'todos') {
-      return mockLeagues;
-    }
-    return mockLeagues.filter(league => league.sport === selectedSport || league.sport === 'all');
-  };
-
-  const filteredLeagues = getFilteredLeagues();
+  // Obtener todas las ligas - simplificado
+  const filteredLeagues = mockLeagues;
 
   return (
     <div className="min-h-screen bg-[#1a1d29] text-white flex flex-col">
       {/* Contenido principal wrapper */}
       <div className="flex flex-1">
-        {/* Sidebar izquierda - Deportes */}
-        <div className="w-64 bg-[#1a1d29] border-r border-gray-700 p-4">
-          <div className="mb-6">
-            <div className="flex items-center mb-4">
-              <span className="text-2xl mr-3">🏆</span>
-              <h2 className="text-lg font-semibold">Deportes</h2>
+        {/* Panel de Usuario */}
+        <div className="w-80 bg-[#1a1d29] border-r border-gray-700 flex flex-col">
+          <UserPanel username={mockUser.username} />
+          
+          {/* Bot Simulator - Solo mostrar si hay usuario autenticado */}
+          {user && challenges.length > 0 && (
+            <div className="p-4 border-t border-gray-700">
+              <BotSimulator autoSimulate={false} />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            {dynamicSportsCategories.map((sport) => (
-              <button
-                key={sport.id}
-                onClick={() => setSelectedSport(sport.id)}
-                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                  selectedSport === sport.id
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
-              >
-                <div className="flex items-center">
-                  <span className="mr-3 text-lg">{sport.icon}</span>
-                  <span className="font-medium">{sport.name}</span>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  selectedSport === sport.id
-                    ? 'bg-blue-800 text-blue-100'
-                    : 'bg-gray-700 text-gray-300'
-                }`}>
-                  {sport.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Sección de Ligas */}
-          <div className="mt-8 mb-6">
-            <div className="flex items-center mb-4">
-              <span className="text-2xl mr-3">🏟️</span>
-              <h2 className="text-lg font-semibold">Ligas</h2>
-            </div>
-          </div>
-
-          <div className="space-y-2 mb-6">
-            {filteredLeagues.map((league) => (
-              <button
-                key={league.id}
-                onClick={() => setSelectedLeague(league.id)}
-                className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                  selectedLeague === league.id
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`}
-              >
-                <div className="flex items-center">
-                  <span className="mr-3 text-lg">{league.icon}</span>
-                  <div className="text-left">
-                    <div className="font-medium text-sm">{league.name}</div>
-                    <div className="text-xs text-gray-500">{league.country}</div>
-                  </div>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  selectedLeague === league.id
-                    ? 'bg-purple-800 text-purple-100'
-                    : 'bg-gray-700 text-gray-300'
-                }`}>
-                  {league.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-8 p-3 bg-gray-800 rounded-lg">
-            <div className="text-xs text-gray-400 space-y-1">
-              <div className="flex justify-between">
-                <span>Total Deportes:</span>
-                <span className="text-white">{dynamicSportsCategories.filter(s => s.count > 0).length - 1}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Retos Activos:</span>
-                <span className="text-white">{activeChallenges.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Mostrando:</span>
-                <span className="text-blue-400">{filteredChallenges.length} retos</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Contenido principal */}
@@ -1122,22 +989,12 @@ export default function Home() {
           {/* Header superior */}
           <div className="bg-[#1a1d29] border-b border-gray-700 px-6 py-4">
             <div className="flex items-center justify-between">
-              {/* Usuario */}
+              {/* Espacio vacío donde estaba el usuario duplicado */}
               <div className="flex items-center">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mr-3 shadow-lg">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
-                <div>
-                  <h1 className="font-semibold text-lg">{mockUser.username}</h1>
-                  <div className="flex items-center text-sm text-gray-400">
-                    <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                    <span>{mockUser.network}</span>
-                  </div>
-                </div>
+                {/* Usuario duplicado eliminado */}
               </div>
 
               {/* Controles derecha */}
-              <WalletConnection />
             </div>
           </div>
 
@@ -1146,25 +1003,36 @@ export default function Home() {
             {/* Navegación de tabs principales */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
+                <div className="flex space-x-2">
                   {[
-                    { key: 'retos', label: '🎯 Retos Activos', desc: 'Explora y participa en retos' },
-                    { key: 'crear', label: '➕ Crear Reto', desc: 'Crea un nuevo reto' },
-                    { key: 'torneos', label: '🏆 Torneos', desc: 'Torneos oficiales del admin' },
-                    { key: 'live', label: '⚽ En Vivo', desc: 'Resultados deportivos en tiempo real' }
+                    { key: 'retos', label: 'Retos Activos', icon: '🔴' },
+                    { key: 'crear', label: 'Crear Reto', icon: '➕' },
+                    { key: 'torneos', label: 'Torneos', icon: '🏆' },
+                    { key: 'live', label: 'En Vivo', icon: '📊' }
                   ].map((tab) => (
                     <button
                       key={tab.key}
                       onClick={() => setMainTab(tab.key)}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${
                         mainTab === tab.key
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600'
                       }`}
                     >
-                      {tab.label}
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
                     </button>
                   ))}
+                  
+                  {/* Botón Deportes con redirección a /sports */}
+                  <Link href="/sports">
+                    <button
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600"
+                    >
+                      <span>⚽</span>
+                      <span>Deportes</span>
+                    </button>
+                  </Link>
                 </div>
                 <div className="flex space-x-3">
                   {user && (
@@ -1176,13 +1044,6 @@ export default function Home() {
                       Bots
                     </button>
                   )}
-                  <LoginButton variant="primary" size="md" />
-                  <Link href="/sports">
-                    <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center">
-                      <span className="mr-2">🏆</span>
-                      Deportes
-                    </button>
-                  </Link>
                 </div>
               </div>
               
@@ -1194,26 +1055,10 @@ export default function Home() {
                      mainTab === 'crear' ? 'Crear Nuevo Reto' :
                      mainTab === 'torneos' ? 'Torneos Oficiales' : 
                      mainTab === 'live' ? 'Deportes en Vivo' : 'Configurar Reto'}
-                    {mainTab === 'retos' && selectedSport !== 'todos' && (
-                      <span className="ml-3 px-3 py-1 bg-blue-600/20 text-blue-400 text-sm rounded-full border border-blue-600/30">
-                        {dynamicSportsCategories.find(s => s.id === selectedSport)?.icon} {dynamicSportsCategories.find(s => s.id === selectedSport)?.name}
-                      </span>
-                    )}
-                    {mainTab === 'retos' && selectedLeague !== 'todas' && (
-                      <span className="ml-3 px-3 py-1 bg-purple-600/20 text-purple-400 text-sm rounded-full border border-purple-600/30">
-                        {filteredLeagues.find(l => l.id === selectedLeague)?.icon} {filteredLeagues.find(l => l.id === selectedLeague)?.name}
-                      </span>
-                    )}
                   </h2>
                   <p className="text-gray-400">
                     {mainTab === 'retos' 
-                      ? selectedSport === 'todos' && selectedLeague === 'todas'
-                        ? 'Explora y participa en retos disponibles' 
-                        : selectedSport !== 'todos' && selectedLeague === 'todas'
-                          ? `Retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name} - ${filteredChallenges.length} disponibles`
-                          : selectedSport === 'todos' && selectedLeague !== 'todas'
-                            ? `Retos de ${filteredLeagues.find(l => l.id === selectedLeague)?.name} - ${filteredChallenges.length} disponibles`
-                            : `Retos de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name} en ${filteredLeagues.find(l => l.id === selectedLeague)?.name} - ${filteredChallenges.length} disponibles`
+                      ? `Explora y participa en retos disponibles - ${filteredChallenges.length} disponibles`
                       : mainTab === 'crear' 
                         ? 'Elige el tipo de reto que quieres crear'
                         : mainTab === 'torneos'
@@ -1340,20 +1185,12 @@ export default function Home() {
                     {/* Call to action */}
                     <div>
                       <h3 className="text-xl font-semibold text-white mb-2">
-                        {selectedSport === 'todos' ? '¡Crea tu primer reto!' : `¡Crea un reto de ${dynamicSportsCategories.find(s => s.id === selectedSport)?.name}!`}
+                        ¡Crea tu primer reto!
                       </h3>
                       <p className="text-gray-400 mb-6">
-                        {selectedSport === 'todos' ? '¡Sé el primero en crear un reto emocionante con estos eventos populares!' : 'Explora las ligas populares arriba o crea un nuevo reto personalizado'}
+                        ¡Sé el primero en crear un reto emocionante con estos eventos populares!
                       </p>
                       <div className="flex gap-3 justify-center">
-                        {selectedSport !== 'todos' && (
-                          <button 
-                            onClick={() => setSelectedSport('todos')}
-                            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                          >
-                            Ver Todos los Deportes
-                          </button>
-                        )}
                         <button 
                           onClick={() => setMainTab('crear')}
                           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
@@ -2722,17 +2559,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Panel de Usuario */}
-        <div className="w-80 bg-[#1a1d29] border-l border-gray-700 flex flex-col">
-          <UserPanel username={mockUser.username} />
-          
-          {/* Bot Simulator - Solo mostrar si hay usuario autenticado */}
-          {user && challenges.length > 0 && (
-            <div className="p-4 border-t border-gray-700">
-              <BotSimulator autoSimulate={false} />
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Modal para unirse a reto */}

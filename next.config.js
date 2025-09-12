@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   /* config options here */
   
   // Fix for multiple lockfiles warning
@@ -21,16 +20,8 @@ const nextConfig: NextConfig = {
   
   // Optimize for development to prevent worker issues
   experimental: {
-    workerThreads: false,
-  },
-  
-  // Configuración para imágenes
-  images: {
-    domains: [],
-    formats: ['image/jpeg', 'image/png', 'image/webp'],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-  },
+    workerThreads: false
+  }
 };
 
-export default nextConfig;
+module.exports = nextConfig;
