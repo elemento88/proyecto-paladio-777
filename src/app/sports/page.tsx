@@ -460,9 +460,7 @@ export default function SportsPage() {
       
       <div className="flex relative">
         {/* Sidebar izquierda - Ligas */}
-        <div className={`w-60 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden z-10 transition-all duration-300 ${
-          showSidebar ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 lg:fixed lg:top-40 lg:left-4 lg:h-auto absolute`}>
+        <div className="hidden">
           
           {/* Header moderno */}
           <div className="p-4 border-b border-white/10">
@@ -599,9 +597,9 @@ export default function SportsPage() {
         )}
 
         {/* Contenido principal */}
-        <div className="flex-1 lg:ml-68 relative z-20">
+        <div className="flex-1 relative z-20">
           {/* Botón de menú móvil */}
-          <div className="lg:hidden mb-4 p-6">
+          <div className="hidden">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className="group bg-gradient-to-r from-[#2a2d47] to-[#252847] border border-gray-600/50 rounded-xl p-4 flex items-center space-x-3 hover:from-[#323557] hover:to-[#2a2d47] hover:border-gray-500/60 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"
