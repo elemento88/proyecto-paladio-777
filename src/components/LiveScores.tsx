@@ -119,8 +119,7 @@ export default function LiveScores({
           <div>
             <p className="font-medium">Datos de demostración</p>
             <p className="text-xs text-yellow-300 mt-1">
-              API key no suscrita a API-Football. Mostrando datos mock realistas para pruebas.
-              Para datos reales, suscríbete en RapidAPI a la API-Football.
+              Proyecto configurado con datos de ejemplo únicamente para desarrollo y pruebas.
             </p>
           </div>
         </div>

@@ -1,23 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  SportData, 
-  LiveScore, 
-  Fixture, 
-  League, 
-  Team 
+import {
+  SportData,
+  LiveScore,
+  Fixture,
+  League,
+  Team
 } from '@/types/sports'
-import { 
-  SportsAPI, 
-  FootballAPI, 
-  RateLimiter,
-  AVAILABLE_SPORTS 
-} from '@/lib/sportsApi'
-import { 
-  FreeSportsAPI,
-  TheSportsDbAPI 
-} from '@/lib/theSportsDbApi'
-import { getCurrentFootballMatches } from '@/lib/footballApi'
-import { getMassiveSportsEvents } from '@/lib/massiveSportsApi'
 import { UnifiedSportsAPI } from '@/lib/unifiedSportsApi'
 
 interface UseSportsReturn {
@@ -28,335 +16,193 @@ interface UseSportsReturn {
   leagues: League[]
   fixtures: Fixture[]
   teams: Team[]
-  
+
   // Loading states
   loading: boolean
+  loadingSports: boolean
   loadingLive: boolean
   loadingFixtures: boolean
   loadingLeagues: boolean
   loadingTeams: boolean
-  
-  // Error states
+
+  // Utility states
   error: string | null
-  
+  lastUpdate: Date | null
+  canMakeRequest: boolean
+  requestsRemaining: number
+
   // Actions
-  fetchLiveScores: () => Promise<void>
-  fetchTodaysFixtures: () => Promise<void>
-  fetchLeagues: (season?: number) => Promise<void>
-  fetchFixtures: (leagueId?: number, date?: string) => Promise<void>
-  fetchTeams: (leagueId: number, season?: number) => Promise<void>
-  refreshData: () => Promise<void>
-  // Nuevas funciones de búsqueda con TheSportsDB (gratuitas)
+  refreshLiveScores: () => Promise<void>
+  refreshFixtures: () => Promise<void>
+  loadFixtures: (leagueId?: number, date?: string) => Promise<void>
+  loadLeagues: (season?: number) => Promise<void>
+  loadTeams: (leagueId: number, season?: number) => Promise<void>
   searchTeams: (query: string) => Promise<void>
   searchLeagues: (query: string) => Promise<void>
-  
-  // Utility
-  remainingRequests: number
-  canMakeRequest: boolean
 }
 
 export function useSports(): UseSportsReturn {
-  // Data states - Ahora usa TheSportsDB que es completamente gratuito
-  const [sports, setSports] = useState<SportData[]>(FreeSportsAPI.getAvailableSports())
+  // Estados principales de datos mock
+  const [sports] = useState<SportData[]>([
+    { id: 1, name: 'Fútbol', code: 'football' },
+    { id: 2, name: 'Baloncesto', code: 'basketball' },
+    { id: 3, name: 'Fútbol Americano', code: 'american-football' },
+    { id: 4, name: 'Béisbol', code: 'baseball' },
+    { id: 5, name: 'MMA', code: 'mma' }
+  ])
+
   const [liveScores, setLiveScores] = useState<LiveScore[]>([])
   const [todaysFixtures, setTodaysFixtures] = useState<LiveScore[]>([])
   const [leagues, setLeagues] = useState<League[]>([])
   const [fixtures, setFixtures] = useState<Fixture[]>([])
   const [teams, setTeams] = useState<Team[]>([])
-  
-  // Loading states
+
+  // Estados de carga
   const [loading, setLoading] = useState(false)
+  const [loadingSports, setLoadingSports] = useState(false)
   const [loadingLive, setLoadingLive] = useState(false)
   const [loadingFixtures, setLoadingFixtures] = useState(false)
   const [loadingLeagues, setLoadingLeagues] = useState(false)
   const [loadingTeams, setLoadingTeams] = useState(false)
-  
-  // Error state
+
+  // Estados de utilidad
   const [error, setError] = useState<string | null>(null)
-  
-  // Rate limiting
-  const [remainingRequests, setRemainingRequests] = useState(100)
-  const [canMakeRequest, setCanMakeRequest] = useState(true)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [canMakeRequest] = useState(true) // Siempre true para datos mock
+  const [requestsRemaining] = useState(999) // Ilimitado para datos mock
 
-  // Update rate limiting info
-  const updateRateLimit = useCallback(() => {
-    const remaining = RateLimiter.getRemainingRequests()
-    const canRequest = RateLimiter.canMakeRequest()
-    setRemainingRequests(remaining)
-    setCanMakeRequest(canRequest)
-  }, [])
+  // Función para cargar eventos en vivo
+  const refreshLiveScores = useCallback(async () => {
+    setLoadingLive(true)
+    setError(null)
 
-  // Fetch live scores - Usa TheSportsDB (gratuito) con fallback a API anterior
-  const fetchLiveScores = useCallback(async () => {
     try {
-      setLoadingLive(true)
-      setError(null)
-      
-      // Intenta primero con TheSportsDB (gratuito)
-      let scores = await FreeSportsAPI.getLiveScores()
-      
-      // Si no hay datos, intenta con la API anterior (solo si hay requests disponibles)
-      if (scores.length === 0 && RateLimiter.canMakeRequest()) {
-        console.info('No data from TheSportsDB, trying fallback API...')
-        scores = await SportsAPI.getLiveScores()
-        updateRateLimit()
-      }
-      
-      setLiveScores(scores)
+      console.log('🎭 Loading mock live scores...')
+      const allEvents = await UnifiedSportsAPI.getAllEvents()
+
+      // Simular algunos eventos como "en vivo"
+      const liveEvents = allEvents.slice(0, 8).map(event => ({
+        ...event,
+        status: 'Live',
+        homeScore: Math.floor(Math.random() * 4),
+        awayScore: Math.floor(Math.random() * 4)
+      }))
+
+      setLiveScores(liveEvents)
+      setLastUpdate(new Date())
+      console.log(`✅ Loaded ${liveEvents.length} mock live scores`)
+
     } catch (err) {
-      setError('Failed to fetch live scores')
-      console.error('Error fetching live scores:', err)
+      console.error('❌ Error loading live scores:', err)
+      setError('Error cargando marcadores en vivo')
     } finally {
       setLoadingLive(false)
     }
-  }, [updateRateLimit])
+  }, [])
 
-  // Fetch today's fixtures - Usa API masiva con miles de eventos
-  const fetchTodaysFixtures = useCallback(async () => {
+  // Función para cargar fixtures de hoy
+  const refreshFixtures = useCallback(async () => {
+    setLoadingFixtures(true)
+    setError(null)
+
     try {
-      setLoadingFixtures(true)
-      setError(null)
-      
-      console.log('🚀 Cargando eventos deportivos usando UnifiedSportsAPI...')
-      
-      // Usar únicamente UnifiedSportsAPI para evitar errores 403/429
-      const fixtures = await UnifiedSportsAPI.getAllEvents()
-      
-      console.log(`✅ Total de eventos cargados desde UnifiedSportsAPI: ${fixtures.length}`)
-      setTodaysFixtures(fixtures)
-      
+      console.log('🎭 Loading mock fixtures...')
+      const allEvents = await UnifiedSportsAPI.getAllEvents()
+
+      // Tomar eventos para "hoy"
+      const todayEvents = allEvents.slice(0, 12)
+      setTodaysFixtures(todayEvents)
+      setLastUpdate(new Date())
+      console.log(`✅ Loaded ${todayEvents.length} mock fixtures`)
+
     } catch (err) {
-      setError('Failed to fetch sports events')
-      console.error('Error fetching sports events:', err)
-      
-      // Fallback a datos básicos si falla
-      try {
-        console.log('🔄 Usando datos de fallback...')
-        const fallbackEvents = [
-          {
-            id: 8001,
-            sport: 'football',
-            league: 'La Liga',
-            homeTeam: 'Real Madrid',
-            awayTeam: 'Barcelona',
-            homeScore: null,
-            awayScore: null,
-            status: 'Not Started',
-            time: 'VS',
-            date: new Date().toISOString()
-          },
-          {
-            id: 8002,
-            sport: 'basketball',
-            league: 'NBA',
-            homeTeam: 'Lakers',
-            awayTeam: 'Warriors',
-            homeScore: null,
-            awayScore: null,
-            status: 'Not Started',
-            time: 'VS',
-            date: new Date().toISOString()
-          }
-        ]
-        setTodaysFixtures(fallbackEvents)
-      } catch (fallbackErr) {
-        console.error('Error with fallback data:', fallbackErr)
-        setTodaysFixtures([])
-      }
+      console.error('❌ Error loading fixtures:', err)
+      setError('Error cargando partidos de hoy')
     } finally {
       setLoadingFixtures(false)
     }
   }, [])
 
-  // Fetch leagues
-  const fetchLeagues = useCallback(async (season: number = new Date().getFullYear()) => {
-    if (!RateLimiter.canMakeRequest()) {
-      setError('Rate limit reached. Please wait before making more requests.')
-      return
-    }
+  // Funciones simplificadas para compatibilidad
+  const loadFixtures = useCallback(async (leagueId?: number, date?: string) => {
+    await refreshFixtures()
+  }, [refreshFixtures])
 
+  const loadLeagues = useCallback(async (season?: number) => {
+    setLoadingLeagues(true)
     try {
-      setLoadingLeagues(true)
-      setError(null)
-      const leaguesData = await FootballAPI.getLeagues(season)
-      setLeagues(leaguesData)
-      updateRateLimit()
-    } catch (err) {
-      setError('Failed to fetch leagues')
-      console.error('Error fetching leagues:', err)
+      // Mock leagues
+      const mockLeagues: League[] = [
+        { id: 1, name: 'La Liga', country: 'Spain', logo: '', season: 2024 },
+        { id: 2, name: 'Premier League', country: 'England', logo: '', season: 2024 },
+        { id: 3, name: 'NBA', country: 'USA', logo: '', season: 2024 },
+        { id: 4, name: 'NFL', country: 'USA', logo: '', season: 2024 }
+      ]
+      setLeagues(mockLeagues)
     } finally {
       setLoadingLeagues(false)
     }
-  }, [updateRateLimit])
+  }, [])
 
-  // Fetch fixtures
-  const fetchFixtures = useCallback(async (leagueId?: number, date?: string) => {
-    if (!RateLimiter.canMakeRequest()) {
-      setError('Rate limit reached. Please wait before making more requests.')
-      return
-    }
-
+  const loadTeams = useCallback(async (leagueId: number, season?: number) => {
+    setLoadingTeams(true)
     try {
-      setLoadingFixtures(true)
-      setError(null)
-      
-      let fixturesData: Fixture[] = []
-      
-      if (leagueId) {
-        fixturesData = await FootballAPI.getFixturesByLeague(leagueId)
-      } else if (date) {
-        fixturesData = await FootballAPI.getFixturesByDate(date)
-      } else {
-        // Get today's fixtures by default
-        const today = new Date().toISOString().split('T')[0]
-        fixturesData = await FootballAPI.getFixturesByDate(today)
-      }
-      
-      setFixtures(fixturesData)
-      updateRateLimit()
-    } catch (err) {
-      setError('Failed to fetch fixtures')
-      console.error('Error fetching fixtures:', err)
-    } finally {
-      setLoadingFixtures(false)
-    }
-  }, [updateRateLimit])
-
-  // Fetch teams
-  const fetchTeams = useCallback(async (leagueId: number, season: number = new Date().getFullYear()) => {
-    if (!RateLimiter.canMakeRequest()) {
-      setError('Rate limit reached. Please wait before making more requests.')
-      return
-    }
-
-    try {
-      setLoadingTeams(true)
-      setError(null)
-      const teamsData = await FootballAPI.getTeams(leagueId, season)
-      setTeams(teamsData)
-      updateRateLimit()
-    } catch (err) {
-      setError('Failed to fetch teams')
-      console.error('Error fetching teams:', err)
-    } finally {
-      setLoadingTeams(false)
-    }
-  }, [updateRateLimit])
-
-  // Refresh all data
-  const refreshData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      await Promise.allSettled([
-        fetchLiveScores(),
-        fetchTodaysFixtures()
-      ])
-    } catch (err) {
-      setError('Failed to refresh data')
-      console.error('Error refreshing data:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [fetchLiveScores, fetchTodaysFixtures])
-
-  // Nuevas funciones de búsqueda usando TheSportsDB (completamente gratuitas)
-  const searchTeams = useCallback(async (query: string) => {
-    try {
-      setLoadingTeams(true)
-      setError(null)
-      const teamsData = await FreeSportsAPI.searchTeams(query)
-      setTeams(teamsData)
-    } catch (err) {
-      setError('Failed to search teams')
-      console.error('Error searching teams:', err)
+      // Mock teams
+      const mockTeams: Team[] = [
+        { id: 1, name: 'Real Madrid', country: 'Spain', logo: '', venue: 'Santiago Bernabéu' },
+        { id: 2, name: 'Barcelona', country: 'Spain', logo: '', venue: 'Camp Nou' },
+        { id: 3, name: 'Manchester City', country: 'England', logo: '', venue: 'Etihad Stadium' }
+      ]
+      setTeams(mockTeams)
     } finally {
       setLoadingTeams(false)
     }
   }, [])
+
+  const searchTeams = useCallback(async (query: string) => {
+    await loadTeams(1) // Mock search
+  }, [loadTeams])
 
   const searchLeagues = useCallback(async (query: string) => {
-    try {
-      setLoadingLeagues(true)
-      setError(null)
-      const leaguesData = await FreeSportsAPI.searchLeagues(query)
-      setLeagues(leaguesData)
-    } catch (err) {
-      setError('Failed to search leagues')
-      console.error('Error searching leagues:', err)
-    } finally {
-      setLoadingLeagues(false)
-    }
-  }, [])
+    await loadLeagues() // Mock search
+  }, [loadLeagues])
 
-  // Auto-fetch initial data
+  // Cargar datos iniciales
   useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(true)
-      try {
-        // Load today's fixtures on mount
-        await fetchTodaysFixtures()
-      } catch (err) {
-        console.error('Error loading initial data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadInitialData()
-  }, [fetchTodaysFixtures])
-
-  // Auto-refresh live scores every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (liveScores.length > 0 && RateLimiter.canMakeRequest()) {
-        fetchLiveScores()
-      }
-    }, 30000) // 30 seconds
-
-    return () => clearInterval(interval)
-  }, [liveScores.length, fetchLiveScores])
-
-  // Update rate limiting info periodically
-  useEffect(() => {
-    updateRateLimit()
-    const interval = setInterval(updateRateLimit, 60000) // Update every minute
-    return () => clearInterval(interval)
-  }, [updateRateLimit])
+    refreshLiveScores()
+    refreshFixtures()
+  }, [refreshLiveScores, refreshFixtures])
 
   return {
-    // Data
+    // Data states
     sports,
     liveScores,
     todaysFixtures,
     leagues,
     fixtures,
     teams,
-    
+
     // Loading states
     loading,
+    loadingSports,
     loadingLive,
     loadingFixtures,
     loadingLeagues,
     loadingTeams,
-    
-    // Error
+
+    // Utility states
     error,
-    
+    lastUpdate,
+    canMakeRequest,
+    requestsRemaining,
+
     // Actions
-    fetchLiveScores,
-    fetchTodaysFixtures,
-    fetchLeagues,
-    fetchFixtures,
-    fetchTeams,
-    refreshData,
-    // Nuevas funciones de búsqueda (gratuitas)
+    refreshLiveScores,
+    refreshFixtures,
+    loadFixtures,
+    loadLeagues,
+    loadTeams,
     searchTeams,
-    searchLeagues,
-    
-    // Utility
-    remainingRequests,
-    canMakeRequest
+    searchLeagues
   }
 }

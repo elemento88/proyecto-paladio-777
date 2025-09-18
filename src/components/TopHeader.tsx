@@ -99,7 +99,7 @@ export default function TopHeader() {
   }, []);
 
   return (
-    <header className="bg-[#1a1d29] border-b border-gray-700 w-full relative z-50">
+    <header className="bg-[#1a1d29] w-full relative z-50">
       <div className="w-full px-8 py-4">
         <div className="flex items-center justify-between">
           {/* Logo VB y barra de búsqueda */}

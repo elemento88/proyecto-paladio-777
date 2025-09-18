@@ -180,8 +180,8 @@ export interface AmericanFootballGame {
   }
 }
 
-// Hockey types
-export interface HockeyGame {
+// MMA types
+export interface MMAFight {
   id: number
   date: string
   time: string
@@ -190,6 +190,7 @@ export interface HockeyGame {
   status: {
     long: string
     short: string
+    round?: number
     timer?: string
   }
   league: {
@@ -197,33 +198,37 @@ export interface HockeyGame {
     name: string
     logo: string
   }
-  teams: {
-    home: {
+  fighters: {
+    fighter_a: {
       id: number
       name: string
-      logo: string
+      image?: string
+      country: string
+      weight_class: string
+      record: {
+        wins: number
+        losses: number
+        draws: number
+      }
     }
-    away: {
+    fighter_b: {
       id: number
       name: string
-      logo: string
+      image?: string
+      country: string
+      weight_class: string
+      record: {
+        wins: number
+        losses: number
+        draws: number
+      }
     }
   }
-  scores: {
-    home: {
-      period_1?: number
-      period_2?: number
-      period_3?: number
-      overtime?: number
-      total?: number
-    }
-    away: {
-      period_1?: number
-      period_2?: number
-      period_3?: number
-      overtime?: number
-      total?: number
-    }
+  result?: {
+    winner?: 'fighter_a' | 'fighter_b' | 'draw' | 'no_contest'
+    method?: string
+    round?: number
+    time?: string
   }
 }
 
@@ -282,7 +287,7 @@ export interface ApiResponse<T> {
 }
 
 // Unified Game type for all sports
-export type Game = Fixture | BasketballGame | AmericanFootballGame | HockeyGame | BaseballGame
+export type Game = Fixture | BasketballGame | AmericanFootballGame | MMAFight | BaseballGame
 
 // Live scores interface
 export interface LiveScore {

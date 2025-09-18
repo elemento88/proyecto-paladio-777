@@ -5,10 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
 import DatabaseDiagnostic from '@/components/DatabaseDiagnostic';
-import { useSports } from '@/hooks/useSports';
+import CacheStatus from '@/components/CacheStatus';
+import InfiniteScrollLoader from '@/components/InfiniteScrollLoader';
+import CacheDebugger from '@/components/CacheDebugger';
+import EventsForcer from '@/components/EventsForcer';
+import { useEventsLoader } from '@/hooks/useEventsLoader';
 import { LiveScore } from '@/types/sports';
 import { getTeamLogo, isImageUrl } from '@/lib/teamLogos';
-import { UnifiedSportsAPI } from '@/lib/unifiedSportsApi';
+import ApiStatusIndicator from '@/components/ApiStatusIndicator';
+import ForceDataRefresh from '@/components/ForceDataRefresh';
 
 interface SportCategory {
   id: string;
@@ -60,8 +65,8 @@ const sportsCategories: SportCategory[] = [
     upcomingGames: 127,
     totalVolume: '$2.4M',
     popularLeagues: ['Champions League', 'Premier League', 'La Liga', 'Serie A'],
-    color: 'text-green-400',
-    bgColor: 'from-green-900/20 to-green-800/10'
+    color: 'text-gray-400',
+    bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20'
   },
   {
     id: 'baloncesto',
@@ -73,8 +78,8 @@ const sportsCategories: SportCategory[] = [
     upcomingGames: 89,
     totalVolume: '$1.8M',
     popularLeagues: ['NBA', 'Euroliga', 'NCAA', 'FIBA'],
-    color: 'text-orange-400',
-    bgColor: 'from-orange-900/20 to-orange-800/10'
+    color: 'text-gray-400',
+    bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20'
   },
   {
     id: 'futbol-americano',
@@ -86,8 +91,8 @@ const sportsCategories: SportCategory[] = [
     upcomingGames: 64,
     totalVolume: '$1.2M',
     popularLeagues: ['NFL', 'NCAA', 'CFL', 'XFL'],
-    color: 'text-purple-400',
-    bgColor: 'from-purple-900/20 to-purple-800/10'
+    color: 'text-gray-400',
+    bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20'
   },
   {
     id: 'beisbol',
@@ -99,133 +104,22 @@ const sportsCategories: SportCategory[] = [
     upcomingGames: 203,
     totalVolume: '$750K',
     popularLeagues: ['MLB', 'NPB', 'KBO', 'Caribbean Series'],
-    color: 'text-red-400',
-    bgColor: 'from-red-900/20 to-red-800/10'
-  },
-];
-
-// Datos mock de juegos próximos
-const upcomingGames: UpcomingGame[] = [
-  {
-    id: '1',
-    sport: 'Fútbol',
-    sportIcon: '⚽',
-    league: 'Premier League',
-    homeTeam: 'Manchester City',
-    awayTeam: 'Liverpool',
-    homeTeamLogo: getTeamLogo('Manchester City'),
-    awayTeamLogo: getTeamLogo('Liverpool'),
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    time: '17:30',
-    venue: 'Etihad Stadium',
-    status: 'soon',
-    minutesToStart: 45,
-    odds: { home: '2.10', draw: '3.40', away: '3.20' },
-    totalBets: 1247,
-    volume: '$89.4K',
-    color: 'text-green-400',
-    bgColor: 'from-green-900/20 to-green-800/10'
+    color: 'text-gray-400',
+    bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20'
   },
   {
-    id: '2',
-    sport: 'Baloncesto',
-    sportIcon: '🏀',
-    league: 'NBA',
-    homeTeam: 'Lakers',
-    awayTeam: 'Warriors',
-    homeTeamLogo: getTeamLogo('Lakers'),
-    awayTeamLogo: getTeamLogo('Warriors'),
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    time: '22:30',
-    venue: 'Crypto.com Arena',
-    status: 'upcoming',
-    minutesToStart: 180,
-    odds: { home: '1.95', away: '1.85' },
-    totalBets: 892,
-    volume: '$67.2K',
-    color: 'text-orange-400',
-    bgColor: 'from-orange-900/20 to-orange-800/10'
+    id: 'mma',
+    name: 'MMA',
+    icon: '🥊',
+    logo: '🥊',
+    description: 'UFC, Bellator y competencias de artes marciales mixtas',
+    activeGames: 12,
+    upcomingGames: 45,
+    totalVolume: '$650K',
+    popularLeagues: ['UFC', 'Bellator', 'ONE Championship', 'PFL'],
+    color: 'text-gray-400',
+    bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20'
   },
-  {
-    id: '3',
-    sport: 'Fútbol',
-    sportIcon: '⚽',
-    league: 'La Liga',
-    homeTeam: 'Real Madrid',
-    awayTeam: 'Barcelona',
-    homeTeamLogo: getTeamLogo('Real Madrid'),
-    awayTeamLogo: getTeamLogo('Barcelona'),
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    time: '20:00',
-    venue: 'Santiago Bernabéu',
-    status: 'live',
-    minutesToStart: 0,
-    odds: { home: '2.30', draw: '3.10', away: '2.90' },
-    totalBets: 2156,
-    volume: '$124.8K',
-    color: 'text-green-400',
-    bgColor: 'from-green-900/20 to-green-800/10'
-  },
-  {
-    id: '4',
-    sport: 'Fútbol Americano',
-    sportIcon: '🏈',
-    league: 'NFL',
-    homeTeam: 'Chiefs',
-    awayTeam: 'Ravens',
-    homeTeamLogo: getTeamLogo('Chiefs'),
-    awayTeamLogo: getTeamLogo('Ravens'),
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    time: '21:00',
-    venue: 'Arrowhead Stadium',
-    status: 'soon',
-    minutesToStart: 90,
-    odds: { home: '1.75', away: '2.05' },
-    totalBets: 1687,
-    volume: '$156.3K',
-    color: 'text-purple-400',
-    bgColor: 'from-purple-900/20 to-purple-800/10'
-  },
-  {
-    id: '5',
-    sport: 'Baloncesto',
-    sportIcon: '🏀',
-    league: 'NBA',
-    homeTeam: 'Celtics',
-    awayTeam: 'Heat',
-    homeTeamLogo: getTeamLogo('Celtics'),
-    awayTeamLogo: getTeamLogo('Heat'),
-    date: '2024-01-29',
-    time: '19:00',
-    venue: 'TD Garden',
-    status: 'upcoming',
-    minutesToStart: 1200,
-    odds: { home: '1.70', away: '2.10' },
-    totalBets: 634,
-    volume: '$38.9K',
-    color: 'text-orange-400',
-    bgColor: 'from-orange-900/20 to-orange-800/10'
-  },
-  {
-    id: '6',
-    sport: 'Béisbol',
-    sportIcon: '⚾',
-    league: 'MLB Spring',
-    homeTeam: 'Yankees',
-    awayTeam: 'Red Sox',
-    homeTeamLogo: getTeamLogo('Yankees'),
-    awayTeamLogo: getTeamLogo('Red Sox'),
-    date: '2024-01-29',
-    time: '13:05',
-    venue: 'Yankee Stadium',
-    status: 'upcoming',
-    minutesToStart: 960,
-    odds: { home: '1.85', away: '1.95' },
-    totalBets: 567,
-    volume: '$34.2K',
-    color: 'text-red-400',
-    bgColor: 'from-red-900/20 to-red-800/10'
-  }
 ];
 
 export default function SportsPage() {
@@ -233,388 +127,203 @@ export default function SportsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
   const [selectedSport, setSelectedSport] = useState<string>('all');
-  const [showSidebar, setShowSidebar] = useState(false);
-  
-  // Estados para scroll infinito
-  const [displayedCount, setDisplayedCount] = useState(60);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  
-  // Estados para API masiva
-  const [massiveEvents, setMassiveEvents] = useState<LiveScore[]>([]);
-  const [loadingMassive, setLoadingMassive] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Hook para obtener datos deportivos reales
-  const { 
-    sports: availableSports,
-    todaysFixtures, 
-    loading, 
-    error,
-    fetchTodaysFixtures 
-  } = useSports();
-  
-  // Obtener parámetros de URL
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const {
+    filteredEvents,
+    loading,
+    loadingMore,
+    initialLoading,
+    hasMore,
+    totalEvents,
+    currentPage,
+    loadMore,
+    searchEvents,
+    filterEvents,
+    refreshEvents,
+    cacheStats,
+    error
+  } = useEventsLoader();
+
   const sportFilter = searchParams.get('sport');
   const gameCount = searchParams.get('gameCount') ? parseInt(searchParams.get('gameCount')!) : 1;
 
-  // Función para cargar eventos masivos
-  const loadMassiveEvents = async () => {
-    if (loadingMassive) return;
-    
-    setLoadingMassive(true);
-    try {
-      console.log('🚀 Loading massive sports events...');
-      const events = await UnifiedSportsAPI.getAllEvents();
-      console.log(`✅ Loaded ${events.length} massive events`);
-      setMassiveEvents(events);
-    } catch (error) {
-      console.error('❌ Error loading massive events:', error);
-    } finally {
-      setLoadingMassive(false);
+  const handleSearch = (query: string) => {
+    setSearchTerm(query);
+    searchEvents(query);
+  };
+
+  const handleFilter = () => {
+    const filters: any = {};
+    if (selectedSport !== 'all') {
+      // Convertir ID de deporte a nombre español para el filtro
+      const sportData = sportsCategories.find(s => s.id === selectedSport);
+      if (sportData) {
+        filters.sport = sportData.name;
+      }
+    }
+    if (selectedLeague !== 'all') filters.league = selectedLeague;
+    filterEvents(filters);
+  };
+
+  useEffect(() => {
+    handleFilter();
+  }, [selectedSport, selectedLeague]);
+
+  const availableLeagues = useMemo(() => {
+    const leagues = new Set<string>();
+    filteredEvents?.forEach(event => {
+      if (event?.league) {
+        leagues.add(event.league);
+      }
+    });
+    return Array.from(leagues).sort();
+  }, [filteredEvents]);
+
+  // Mapear ligas por deporte para el panel lateral - Ligas más populares
+  const leaguesBySport = useMemo(() => {
+    return {
+      'futbol': {
+        name: 'Fútbol',
+        icon: '⚽',
+        color: 'text-gray-400',
+        leagues: ['La Liga', 'Premier League', 'Serie A', 'Bundesliga', 'Champions League', 'Ligue 1', 'Copa Libertadores', 'Liga MX', 'MLS']
+      },
+      'baloncesto': {
+        name: 'Baloncesto',
+        icon: '🏀',
+        color: 'text-gray-400',
+        leagues: ['NBA', 'Euroliga', 'NCAA March Madness', 'FIBA World Cup', 'ACB Liga Endesa', 'CBA China', 'NBL Australia', 'G League']
+      },
+      'futbol-americano': {
+        name: 'Fútbol Americano',
+        icon: '🏈',
+        color: 'text-gray-400',
+        leagues: ['NFL', 'NCAA Football', 'CFL Canadian', 'XFL', 'USFL', 'NFL Playoffs', 'Super Bowl', 'College Football Playoff']
+      },
+      'beisbol': {
+        name: 'Béisbol',
+        icon: '⚾',
+        color: 'text-gray-400',
+        leagues: ['MLB', 'World Series', 'NPB Japan', 'KBO Korea', 'Caribbean Series', 'LMB Mexico', 'Winter Leagues', 'World Baseball Classic']
+      },
+      'mma': {
+        name: 'MMA',
+        icon: '🥊',
+        color: 'text-gray-400',
+        leagues: ['UFC', 'Bellator MMA', 'ONE Championship', 'PFL', 'Rizin FF', 'KSW', 'Cage Warriors', 'LFA']
+      }
+    };
+  }, []);
+
+  const getSportData = (sportFromApi: string) => {
+    const sportMappings: { [key: string]: string } = {
+      'football': 'futbol',
+      'basketball': 'baloncesto',
+      'american football': 'futbol-americano',
+      'baseball': 'beisbol',
+      'mma': 'mma'
+    }
+
+    const mappedId = sportMappings[sportFromApi.toLowerCase()] || sportFromApi.toLowerCase()
+    return sportsCategories.find(s => s.id === mappedId) || {
+      id: sportFromApi,
+      name: sportFromApi.charAt(0).toUpperCase() + sportFromApi.slice(1),
+      icon: '⚽',
+      color: 'text-blue-400',
+      bgColor: 'bg-gradient-to-br from-blue-900 to-blue-800 bg-opacity-20'
     }
   };
 
-  // Cargar eventos al montar
-  useEffect(() => {
-    fetchTodaysFixtures();
-    loadMassiveEvents();
-  }, [fetchTodaysFixtures]);
+  const convertToUpcomingGame = (liveScore: LiveScore): UpcomingGame => {
+    const sportIcons: Record<string, string> = {
+      'Fútbol': '⚽', 'Football': '⚽', 'Soccer': '⚽',
+      'Baloncesto': '🏀', 'Basketball': '🏀',
+      'Fútbol Americano': '🏈', 'American Football': '🏈',
+      'Béisbol': '⚾', 'Baseball': '⚾',
+      'MMA': '🥊', 'Hockey': '🏒', 'Tenis': '🎾',
+    };
 
-  // Convertir datos de API a formato de juego
-  const convertApiDataToGame = (liveScore: LiveScore): UpcomingGame => {
-    if (!liveScore || !liveScore.homeTeam || !liveScore.awayTeam) {
-      throw new Error('Datos de evento incompletos');
-    }
+    const sportColors: Record<string, { color: string; bgColor: string }> = {
+      'Fútbol': { color: 'text-gray-400', bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20' },
+      'Baloncesto': { color: 'text-gray-400', bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20' },
+      'Fútbol Americano': { color: 'text-gray-400', bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20' },
+      'Béisbol': { color: 'text-gray-400', bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20' },
+      'MMA': { color: 'text-gray-400', bgColor: 'bg-gradient-to-br from-gray-900 to-gray-800 bg-opacity-20' },
+    };
 
-    const sportColors = {
-      'football': { color: 'text-green-400', bgColor: 'from-green-900/20 to-green-800/10' },
-      'soccer': { color: 'text-green-400', bgColor: 'from-green-900/20 to-green-800/10' },
-      'basketball': { color: 'text-orange-400', bgColor: 'from-orange-900/20 to-orange-800/10' },
-      'american football': { color: 'text-purple-400', bgColor: 'from-purple-900/20 to-purple-800/10' },
-      'ice hockey': { color: 'text-blue-400', bgColor: 'from-blue-900/20 to-blue-800/10' },
-      'baseball': { color: 'text-red-400', bgColor: 'from-red-900/20 to-red-800/10' },
-    } as const;
+    const sportData = getSportData(liveScore.sport || 'football');
+    const sport = sportData.name;
+    const colors = sportColors[sport] || { color: sportData.color, bgColor: sportData.bgColor };
 
-    const sport = (liveScore.sport || 'football').toLowerCase();
-    const sportInfo = sportColors[sport as keyof typeof sportColors] || 
-                     { color: 'text-gray-400', bgColor: 'from-gray-900/20 to-gray-800/10' };
-
-    const sportIcons = {
-      'football': '⚽',
-      'soccer': '⚽',
-      'basketball': '🏀', 
-      'american football': '🏈',
-      'ice hockey': '🏒',
-      'baseball': '⚾',
-    } as const;
-
-    let eventDate: Date;
-    let minutesToStart = 0;
-    
-    try {
-      eventDate = new Date(liveScore.date || new Date());
-      const now = new Date();
-      minutesToStart = Math.max(0, Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60)));
-    } catch (error) {
-      eventDate = new Date();
-      console.warn('Error parsing date:', error);
-    }
-    
-    const sportName = sport === 'football' ? 'Fútbol' :
-                     sport === 'soccer' ? 'Fútbol' : 
-                     sport === 'basketball' ? 'Baloncesto' :
-                     sport === 'american football' ? 'Fútbol Americano' :
-                     sport === 'ice hockey' ? 'Hockey' :
-                     sport === 'baseball' ? 'Béisbol' :
-                     sport.charAt(0).toUpperCase() + sport.slice(1);
-    
     return {
-      id: (liveScore.id || Math.random()).toString(),
-      sport: sportName,
-      sportIcon: sportIcons[sport as keyof typeof sportIcons] || '🏆',
+      id: liveScore.id.toString(),
+      sport: sport,
+      sportIcon: sportIcons[sport] || '🏆',
       league: liveScore.league || 'Liga',
       homeTeam: liveScore.homeTeam || 'Equipo Local',
       awayTeam: liveScore.awayTeam || 'Equipo Visitante',
       homeTeamLogo: getTeamLogo(liveScore.homeTeam || 'Equipo Local'),
       awayTeamLogo: getTeamLogo(liveScore.awayTeam || 'Equipo Visitante'),
-      date: eventDate.toISOString().split('T')[0],
+      date: liveScore.date ? new Date(liveScore.date).toLocaleDateString('es-ES', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }) : new Date().toLocaleDateString('es-ES', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }),
       time: liveScore.time || 'TBD',
       venue: 'Stadium',
-      status: (liveScore.status === 'Match Finished' || liveScore.status?.includes('Finished')) ? 'upcoming' : 
-              (liveScore.status?.includes('Half') || liveScore.status?.includes('Live')) ? 'live' :
-              minutesToStart < 120 ? 'soon' : 'upcoming',
-      minutesToStart,
+      status: (() => {
+        if (liveScore.status?.includes('Live')) return 'live';
+        if (liveScore.status?.includes('Finished')) return 'upcoming';
+
+        // Calcular si el evento es muy pronto (menos de 24 horas)
+        const eventDate = new Date(liveScore.date || new Date());
+        const now = new Date();
+        const hoursUntilEvent = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        return hoursUntilEvent < 24 ? 'soon' : 'upcoming';
+      })(),
+      minutesToStart: (() => {
+        const eventDate = new Date(liveScore.date || new Date());
+        const now = new Date();
+        const minutesUntilEvent = Math.max(0, Math.floor((eventDate.getTime() - now.getTime()) / (1000 * 60)));
+        return minutesUntilEvent;
+      })(),
       odds: {
         home: '2.10',
-        draw: sport === 'soccer' ? '3.20' : undefined,
+        draw: sport === 'Fútbol' ? '3.20' : undefined,
         away: '1.85'
       },
       totalBets: Math.floor(Math.random() * 500) + 100,
       volume: `$${(Math.random() * 100 + 20).toFixed(1)}K`,
-      ...sportInfo
+      ...colors
     };
   };
 
-  // Combinar eventos reales de API con massive y mock
-  console.log('🔍 Debug - todaysFixtures:', todaysFixtures?.length || 0, 'events');
-  console.log('🔍 Debug - massiveEvents:', massiveEvents?.length || 0, 'events');
-  console.log('📋 Sample fixtures:', todaysFixtures?.slice(0, 3));
-  
-  const realGames = todaysFixtures
-    ?.filter(fixture => fixture && fixture.homeTeam && fixture.awayTeam)
-    ?.map(fixture => {
-      try {
-        console.log('🔄 Converting fixture:', fixture.homeTeam, 'vs', fixture.awayTeam);
-        return convertApiDataToGame(fixture);
-      } catch (error) {
-        console.warn('Error converting API data:', error, fixture);
-        return null;
-      }
-    })
-    ?.filter(Boolean) || [];
-    
-  console.log('✅ Real games converted:', realGames.length);
-  
-  // Convertir eventos masivos
-  const massiveGames = massiveEvents
-    ?.filter(event => event && event.homeTeam && event.awayTeam)
-    ?.map(event => {
-      try {
-        return convertApiDataToGame(event);
-      } catch (error) {
-        console.warn('Error converting massive API data:', error, event);
-        return null;
-      }
-    })
-    ?.filter(Boolean) || [];
-    
-  console.log('✅ Massive games converted:', massiveGames.length);
-    
-  // Combinar TODOS los eventos: reales + masivos + mock
-  const allGames = [...realGames, ...massiveGames, ...upcomingGames];
-  
-  // Log para debugging
-  React.useEffect(() => {
-    console.log(`🎯 TOTAL DE EVENTOS DISPONIBLES: ${allGames.length}`);
-    console.log(`📊 Eventos reales de API: ${realGames.length}`);
-    console.log(`🚀 Eventos masivos de API: ${massiveGames.length}`);
-    console.log(`🎭 Eventos mock/sintéticos: ${upcomingGames.length}`);
-    console.log(`🔍 Sample allGames:`, allGames.slice(0, 2));
-  }, [allGames.length, realGames.length, massiveGames.length]);
-
-  // Filtrar deportes basado en búsqueda
-  const filteredSports = sportsCategories.filter(sport =>
-    sport.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Obtener ligas únicas
-  const availableLeagues = useMemo(() => {
-    const leagues = new Set<string>();
-    allGames?.forEach(game => {
-      if (game?.league) {
-        leagues.add(game.league);
-      }
-    });
-    return Array.from(leagues).sort();
-  }, [allGames]);
-
-  // Filtrar juegos
-  const filteredGames = useMemo(() => {
-    let games = allGames || [];
-    
-    if (sportFilter) {
-      games = games.filter(game => game?.sport?.toLowerCase() === sportFilter.toLowerCase());
-    }
-    
-    if (selectedSport && selectedSport !== 'all') {
-      games = games.filter(game => game?.sport?.toLowerCase() === selectedSport.toLowerCase());
-    }
-    
-    if (selectedLeague && selectedLeague !== 'all') {
-      games = games.filter(game => game?.league === selectedLeague);
-    }
-    
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase().trim();
-      games = games.filter(game => {
-        if (!game) return false;
-        
-        const homeTeamMatch = game.homeTeam?.toLowerCase().includes(searchLower);
-        const awayTeamMatch = game.awayTeam?.toLowerCase().includes(searchLower);
-        const leagueMatch = game.league?.toLowerCase().includes(searchLower);
-        const sportMatch = game.sport?.toLowerCase().includes(searchLower);
-        
-        return homeTeamMatch || awayTeamMatch || leagueMatch || sportMatch;
-      });
-    }
-    
-    return games;
-  }, [allGames, sportFilter, selectedSport, selectedLeague, searchTerm]);
-
-  // Eventos para mostrar
-  const displayedGames = filteredGames.slice(0, displayedCount);
+  const displayedGames = filteredEvents.map(convertToUpcomingGame);
 
   return (
-    <div className="min-h-screen bg-[#1a1d29] text-white">
-      {/* Header espacio reservado */}
-      <div className="h-16 bg-[#1a1d29] relative z-50"></div>
-      
+    <div className="min-h-screen bg-gray-900 text-white">
+      <CacheDebugger />
+      <EventsForcer />
+
+      {/* Espacio para el header fijo - SIN línea negra */}
+      <div className="h-16 bg-transparent"></div>
+
       <div className="flex relative">
-        {/* Sidebar izquierda - Ligas */}
-        <div className="hidden">
-          
-          {/* Header moderno */}
-          <div className="p-4 border-b border-white/10">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-gradient-to-r from-emerald-400 to-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-white">Competiciones</h3>
-                </div>
-              </div>
-              <div className="bg-emerald-500/20 px-2 py-1 rounded-md">
-                <span className="text-xs font-semibold text-emerald-400">{availableLeagues.length}</span>
-              </div>
-            </div>
-            
-            {/* Botón Todas las Ligas moderno */}
-            <button
-              onClick={() => setSelectedLeague('all')}
-              className={`group w-full p-2 rounded-lg transition-all duration-200 ${
-                selectedLeague === 'all' 
-                  ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-400/30 shadow-lg' 
-                  : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                    selectedLeague === 'all' ? 'bg-emerald-400/20' : 'bg-white/10'
-                  }`}>
-                    <svg className={`w-4 h-4 ${selectedLeague === 'all' ? 'text-emerald-400' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z"/>
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <div className={`text-sm font-medium ${selectedLeague === 'all' ? 'text-emerald-400' : 'text-gray-200'}`}>
-                      Todas las ligas
-                    </div>
-                  </div>
-                </div>
-                <div className={`text-xs font-bold px-2 py-1 rounded-md ${
-                  selectedLeague === 'all' 
-                    ? 'bg-emerald-400/20 text-emerald-400' 
-                    : 'bg-white/10 text-gray-400'
-                }`}>
-                  {allGames?.length || 0}
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* Lista de ligas moderna */}
-          <div className="p-3 space-y-1">
-            {availableLeagues.filter(league => {
-              const popularLeagues = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'NBA', 'NFL', 'MLB', 'Champions League'];
-              return popularLeagues.includes(league);
-            }).slice(0, 6).map(league => {
-              const leagueGames = allGames?.filter(game => game?.league === league) || [];
-              
-              const leagueData = {
-                'Premier League': { icon: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: 'from-purple-500/20 to-indigo-500/20', border: 'border-purple-400/30', text: 'text-purple-400', bg: 'bg-purple-400/20' },
-                'La Liga': { icon: '🇪🇸', color: 'from-red-500/20 to-orange-500/20', border: 'border-red-400/30', text: 'text-red-400', bg: 'bg-red-400/20' },
-                'Serie A': { icon: '🇮🇹', color: 'from-green-500/20 to-teal-500/20', border: 'border-green-400/30', text: 'text-green-400', bg: 'bg-green-400/20' },
-                'Bundesliga': { icon: '🇩🇪', color: 'from-yellow-500/20 to-amber-500/20', border: 'border-yellow-400/30', text: 'text-yellow-400', bg: 'bg-yellow-400/20' },
-                'NBA': { icon: '🏀', color: 'from-orange-500/20 to-red-500/20', border: 'border-orange-400/30', text: 'text-orange-400', bg: 'bg-orange-400/20' },
-                'NFL': { icon: '🏈', color: 'from-blue-500/20 to-indigo-500/20', border: 'border-blue-400/30', text: 'text-blue-400', bg: 'bg-blue-400/20' },
-                'MLB': { icon: '⚾', color: 'from-emerald-500/20 to-cyan-500/20', border: 'border-emerald-400/30', text: 'text-emerald-400', bg: 'bg-emerald-400/20' },
-                'Champions League': { icon: '🏆', color: 'from-violet-500/20 to-purple-500/20', border: 'border-violet-400/30', text: 'text-violet-400', bg: 'bg-violet-400/20' }
-              };
-              
-              const data = leagueData[league as keyof typeof leagueData] || { icon: '🏆', color: 'from-gray-500/20 to-gray-400/20', border: 'border-gray-400/30', text: 'text-gray-400', bg: 'bg-gray-400/20' };
-              
-              return (
-                <button
-                  key={league}
-                  onClick={() => setSelectedLeague(league)}
-                  className={`group w-full p-2 rounded-lg transition-all duration-200 hover:scale-[1.01] ${
-                    selectedLeague === league 
-                      ? `bg-gradient-to-r ${data.color} border ${data.border} shadow-lg` 
-                      : 'bg-white/5 border border-transparent hover:bg-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                        selectedLeague === league ? data.bg : 'bg-white/10'
-                      }`}>
-                        <span className="text-sm">{data.icon}</span>
-                      </div>
-                      <div className="text-left flex-1 min-w-0">
-                        <div className={`text-sm font-medium truncate ${
-                          selectedLeague === league ? data.text : 'text-gray-200 group-hover:text-white'
-                        }`}>
-                          {league}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {leagueGames.length} evento{leagueGames.length !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`text-xs font-bold px-2 py-1 rounded-md ${
-                      selectedLeague === league 
-                        ? `${data.bg} ${data.text}` 
-                        : 'bg-white/10 text-gray-400 group-hover:bg-white/20'
-                    }`}>
-                      {leagueGames.length}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-            
-            {availableLeagues.length === 0 && (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl opacity-50">🏆</span>
-                </div>
-                <p className="text-sm text-gray-500">No hay ligas disponibles</p>
-              </div>
-            )}
-          </div>
-
-        </div>
-
-        {/* Overlay para móvil */}
-        {showSidebar && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-            onClick={() => setShowSidebar(false)}
-          />
-        )}
-
-        {/* Contenido principal */}
         <div className="flex-1 relative z-20">
-          {/* Botón de menú móvil */}
-          <div className="hidden">
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="group bg-gradient-to-r from-[#2a2d47] to-[#252847] border border-gray-600/50 rounded-xl p-4 flex items-center space-x-3 hover:from-[#323557] hover:to-[#2a2d47] hover:border-gray-500/60 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"
-            >
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                <span className="text-white text-lg">☰</span>
-              </div>
-              <div>
-                <span className="font-semibold text-white">Ligas</span>
-                <div className="text-xs text-gray-400">Ver competencias</div>
-              </div>
-            </button>
-          </div>
-          
           <div className="max-w-full mx-auto px-4 py-6">
+
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
@@ -622,200 +331,304 @@ export default function SportsPage() {
                   <div className="flex items-center space-x-4 mb-2">
                     <h1 className="text-4xl font-bold text-white">Deportes</h1>
                     {gameCount > 1 && (
-                      <span className="bg-green-600/20 text-green-400 px-3 py-1 rounded-lg text-sm">
+                      <span className="bg-green-600 bg-opacity-20 text-green-400 px-3 py-1 rounded-lg text-sm">
                         Añadiendo Partido {gameCount} de 15
-                      </span>
-                    )}
-                    {selectedLeague && selectedLeague !== 'all' && (
-                      <span className="bg-purple-600/20 text-purple-400 px-3 py-1 rounded-lg text-sm">
-                        Liga: {selectedLeague}
-                      </span>
-                    )}
-                    {selectedSport && selectedSport !== 'all' && (
-                      <span className="bg-green-600/20 text-green-400 px-3 py-1 rounded-lg text-sm">
-                        Deporte: {selectedSport}
                       </span>
                     )}
                   </div>
                   <p className="text-gray-400">
-                    ✨ {allGames.length} eventos deportivos disponibles • {filteredGames.length} encontrados • Mostrando {displayedCount}
+                    ✨ {mounted ? totalEvents.toLocaleString() : '0'} eventos deportivos disponibles • {mounted ? filteredEvents.length.toLocaleString() : '0'} filtrados • Mostrando {mounted ? displayedGames.length.toLocaleString() : '0'}
                   </p>
+                  {mounted && hasMore && (
+                    <p className="text-sm text-blue-400 mt-1">
+                      📄 Página {currentPage + 1} • Scroll para cargar más eventos automáticamente
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-400">Eventos Totales</div>
-                  <div className="text-2xl font-bold text-white">{allGames?.length || 0}</div>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Grid de juegos próximos */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <h2 className="text-xl font-semibold text-white">🔥 Próximos Eventos</h2>
-                  {filteredGames.length > 0 && (
-                    <span className="bg-green-600/20 text-green-400 px-3 py-1 rounded-lg text-sm">
-                      {filteredGames.length} evento{filteredGames.length !== 1 ? 's' : ''} • {displayedCount} mostrados
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center space-x-3">
-                  {realGames.length > 0 && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-green-400">API en vivo ({realGames.length})</span>
-                    </div>
-                  )}
-                  {loading && (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-xs text-blue-400">Cargando eventos...</span>
-                    </div>
-                  )}
-                  {error && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-red-400">⚠️ {error}</span>
-                    </div>
+                  <div className="text-2xl font-bold text-white">{mounted ? totalEvents.toLocaleString() : '0'}</div>
+                  {mounted && (
+                    <div className="text-xs text-gray-500 mt-1">Cache: {cacheStats.cacheSize}</div>
                   )}
                 </div>
               </div>
 
-              {filteredGames.length === 0 ? (
-                <div className="bg-[#2a2d47] border border-gray-600 rounded-xl p-8 text-center">
-                  <div className="text-4xl mb-4">🏟️</div>
-                  <h3 className="text-xl font-semibold text-white mb-2">No hay eventos disponibles</h3>
-                  <p className="text-gray-400 mb-4">
-                    No encontramos eventos que coincidan con tus filtros actuales.
-                  </p>
-                  <button 
-                    onClick={() => {
-                      setSelectedSport('all');
-                      setSelectedLeague('all');
-                      setSearchTerm('');
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+              {/* Barra horizontal de deportes */}
+              <div className="mb-6">
+                <div className="flex items-center space-x-3 overflow-x-auto py-4 px-2">
+                  <button
+                    onClick={() => setSelectedSport('all')}
+                    className={`flex-shrink-0 flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200 border-2 ${
+                      selectedSport === 'all'
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-xl shadow-blue-500/30 transform scale-105 border-purple-400 ring-2 ring-purple-300/50'
+                        : 'bg-gray-800/50 text-gray-300 border-gray-700/50 hover:bg-gray-700/70 hover:text-white hover:scale-105 hover:border-gray-600'
+                    }`}
                   >
-                    🔄 Mostrar Todos
+                    <span className="text-lg">🏆</span>
+                    <span className="font-medium whitespace-nowrap">Todos</span>
                   </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {displayedGames.map((game, index) => (
-                    <div key={`${game.id}-${index}`} className={`bg-gradient-to-br ${game.bgColor} border border-gray-600 rounded-xl p-6 hover:border-gray-500 transition-all group hover:scale-105 relative overflow-hidden h-full flex flex-col min-h-[325px] aspect-[4/3] w-full`}>
-                      {/* Status indicator */}
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          game.status === 'live' ? 'bg-red-500 animate-pulse' :
-                          game.status === 'soon' ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500'
-                        }`}></div>
-                      </div>
 
-                      {/* Contenido principal */}
-                      <div className="flex-1 flex flex-col">
-                        {/* Header del evento */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <div className={`w-8 h-8 bg-[#2a2d47] rounded-lg flex items-center justify-center text-base ${game.color}`}>
-                              {game.sportIcon}
-                            </div>
-                            <div>
-                              <div className="text-sm text-gray-400">{game.sport}</div>
-                              <div className="text-sm font-medium text-white">{game.league}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-xs font-bold ${game.color}`}>{game.volume}</div>
-                            <div className="text-xs text-gray-400">{game.totalBets} retos</div>
-                          </div>
-                        </div>
-
-                        {/* Equipos */}
-                        <div className="mb-3 flex-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                              {isImageUrl(game.homeTeamLogo) ? (
-                                <img 
-                                  src={game.homeTeamLogo} 
-                                  alt={game.homeTeam}
-                                  className="w-6 h-6 object-contain"
-                                  onError={(e) => {
-                                    const img = e.target as HTMLImageElement;
-                                    img.style.display = 'none';
-                                    const fallbackSpan = document.createElement('span');
-                                    fallbackSpan.className = 'text-base';
-                                    fallbackSpan.textContent = '⚽';
-                                    img.parentNode?.appendChild(fallbackSpan);
-                                  }}
-                                />
-                              ) : (
-                                <span className="text-base">{game.homeTeamLogo}</span>
-                              )}
-                              <span className="text-xs text-white font-medium truncate">{game.homeTeam}</span>
-                            </div>
-                            <div className="mx-2 text-center">
-                              <span className="text-xs text-gray-500 font-bold">VS</span>
-                              <div className="text-xs text-gray-400 mt-1">{game.time}</div>
-                            </div>
-                            <div className="flex items-center space-x-2 flex-1 justify-end min-w-0">
-                              <span className="text-xs text-white font-medium truncate">{game.awayTeam}</span>
-                              {isImageUrl(game.awayTeamLogo) ? (
-                                <img 
-                                  src={game.awayTeamLogo} 
-                                  alt={game.awayTeam}
-                                  className="w-6 h-6 object-contain"
-                                  onError={(e) => {
-                                    const img = e.target as HTMLImageElement;
-                                    img.style.display = 'none';
-                                    const fallbackSpan = document.createElement('span');
-                                    fallbackSpan.className = 'text-base';
-                                    fallbackSpan.textContent = '⚽';
-                                    img.parentNode?.appendChild(fallbackSpan);
-                                  }}
-                                />
-                              ) : (
-                                <span className="text-base">{game.awayTeamLogo}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Información del partido */}
-                        <div className="mb-3">
-                          <div className="text-center">
-                            <div className="text-sm text-gray-300 mb-2">{game.date}</div>
-                            <div className="text-base text-gray-200 mb-2 font-medium">{game.time}</div>
-                            <div className={`text-sm px-2 py-1 rounded inline-block ${
-                              game.status === 'live' ? 'text-red-400 bg-red-900/20 font-bold' :
-                              game.status === 'soon' ? 'text-yellow-400 bg-yellow-900/20 font-bold' : 'text-blue-400 bg-blue-900/20'
-                            }`}>
-                              {game.status === 'live' ? '🔴 EN VIVO' :
-                               game.status === 'soon' ? `⏰ ${game.minutesToStart}min` :
-                               `${Math.floor(game.minutesToStart / 60)}h`}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Botón de acción */}
-                      <div className="pt-2 border-t border-gray-600 mt-auto">
-                        <Link href={`/sports/create?matchId=${game.id}&matchTitle=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&teams=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&date=${encodeURIComponent(game.date)}&time=${encodeURIComponent(game.time)}&league=${encodeURIComponent(game.league)}&sport=${encodeURIComponent(game.sport)}${gameCount > 1 ? `&gameCount=${gameCount}` : ''}`}>
-                          <button className="w-full py-2 px-3 rounded-lg transition-all font-medium text-sm bg-blue-600 hover:bg-blue-700 text-white group-hover:shadow-lg hover:scale-[1.02]">
-                            ➕ Crear Reto
-                          </button>
-                        </Link>
-                      </div>
-                    </div>
+                  {mounted && sportsCategories.map((sportData) => (
+                    <button
+                      key={sportData.id}
+                      onClick={() => setSelectedSport(sportData.id)}
+                      className={`flex-shrink-0 flex items-center space-x-2 px-4 py-3 rounded-lg transition-all duration-200 border-2 ${
+                        selectedSport === sportData.id
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-xl shadow-blue-500/30 transform scale-105 border-blue-400 ring-2 ring-blue-300/50'
+                          : 'bg-gray-800/50 text-gray-300 border-gray-700/50 hover:bg-gray-700/70 hover:text-white hover:scale-105 hover:border-gray-600'
+                      }`}
+                    >
+                      <span className="text-lg">{sportData.icon}</span>
+                      <span className="font-medium whitespace-nowrap">{sportData.name}</span>
+                    </button>
                   ))}
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* Loading State */}
+            {initialLoading && (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-blue-500 border-opacity-30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                  <div className="text-xl font-semibold text-white mb-2">Cargando eventos deportivos...</div>
+                  <div className="text-gray-400">
+                    Preparando {mounted && cacheStats.totalEvents > 0 ? cacheStats.totalEvents.toLocaleString() : '2,000'} eventos para ti
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Grid de juegos */}
+            {!initialLoading && (
+              <div className="mb-8">
+                <div className="flex gap-6">
+                  {/* Panel de Ligas por Deporte - Lado Izquierdo */}
+                  <div className="w-72 bg-gray-900 bg-opacity-50 backdrop-blur rounded-xl p-4 sticky top-20 h-[calc(100vh-6rem)] relative overflow-hidden">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      🏆 Ligas por Deporte
+                    </h3>
+
+                    <div className="space-y-1">
+                      {/* Mostrar ligas del deporte seleccionado en la barra horizontal */}
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                          {selectedSport === 'all' ? (
+                            <>
+                              <span className="text-base">🏆</span>
+                              Todas las Ligas Deportivas
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-base">{leaguesBySport[selectedSport as keyof typeof leaguesBySport]?.icon}</span>
+                              Ligas de {leaguesBySport[selectedSport as keyof typeof leaguesBySport]?.name}
+                            </>
+                          )}
+                        </h4>
+
+                        {/* Ligas del deporte seleccionado */}
+                        {selectedSport !== 'all' && (
+                          <div className="relative">
+                            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-black scrollbar-thumb-black scrollbar-thumb-opacity-70 hover:scrollbar-thumb-opacity-90">
+                              {leaguesBySport[selectedSport as keyof typeof leaguesBySport]?.leagues.map(league => (
+                                <button
+                                  key={league}
+                                  onClick={() => setSelectedLeague(league)}
+                                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                                    selectedLeague === league
+                                      ? 'bg-blue-600 bg-opacity-30 text-blue-300 border border-blue-500 border-opacity-50'
+                                      : 'bg-gray-800 bg-opacity-40 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600'
+                                  }`}
+                                >
+                                  <span className="block truncate">{league}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cuando está en "all", mostrar un resumen de ligas por deporte */}
+                        {selectedSport === 'all' && (
+                          <div className="relative">
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-track-black scrollbar-thumb-black scrollbar-thumb-opacity-70 hover:scrollbar-thumb-opacity-90">
+                              {Object.entries(leaguesBySport).map(([sportId, sportInfo]) => (
+                                <div key={sportId} className="border-l-2 border-gray-700 pl-3">
+                                  <div className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                                    <span className="text-lg">{sportInfo.icon}</span>
+                                    <span>{sportInfo.name}</span>
+                                  </div>
+
+                                  {/* Grid de ligas en filas */}
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {sportInfo.leagues.map(league => (
+                                      <button
+                                        key={league}
+                                        onClick={() => setSelectedLeague(league)}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                                          selectedLeague === league
+                                            ? 'bg-blue-600 bg-opacity-30 text-blue-300 border border-blue-500 border-opacity-50'
+                                            : 'bg-gray-800 bg-opacity-40 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600'
+                                        }`}
+                                      >
+                                        <span className="block truncate">{league}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Todas las Ligas */}
+                      <div className="pt-2 border-t border-gray-700">
+                        <button
+                          onClick={() => setSelectedLeague('all')}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                            selectedLeague === 'all'
+                              ? 'bg-green-600 bg-opacity-20 text-green-300 border border-green-500 border-opacity-30'
+                              : 'text-gray-300 hover:bg-gray-800 hover:bg-opacity-50 hover:text-white'
+                          }`}
+                        >
+                          🌐 Ligas
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contenido Principal */}
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <h2 className="text-xl font-semibold text-white">🔥 Eventos Deportivos</h2>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        {mounted && cacheStats.totalEvents > 0 && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs text-green-400">Cache activo ({cacheStats.totalEvents.toLocaleString()})</span>
+                          </div>
+                        )}
+                        {(loading || loadingMore) && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-xs text-blue-400">{loadingMore ? 'Cargando más...' : 'Procesando...'}</span>
+                          </div>
+                        )}
+                        {error && (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-red-400">⚠️ {error}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {displayedGames.length === 0 ? (
+                      <div className="bg-gray-800 border border-gray-600 rounded-xl p-8 text-center">
+                        <div className="text-4xl mb-4">🏟️</div>
+                        <h3 className="text-xl font-semibold text-white mb-2">
+                          {loading ? 'Cargando eventos...' : 'No hay eventos disponibles'}
+                        </h3>
+                        <p className="text-gray-400 mb-4">
+                          {loading
+                            ? 'Obteniendo eventos deportivos de todas las fuentes...'
+                            : 'No encontramos eventos que coincidan con tus filtros actuales.'
+                          }
+                        </p>
+                        {!loading && (
+                          <button
+                            onClick={() => {
+                              setSelectedSport('all');
+                              setSelectedLeague('all');
+                              setSearchTerm('');
+                              handleSearch('');
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                          >
+                            🔄 Mostrar Todos
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <InfiniteScrollLoader
+                        hasMore={hasMore}
+                        loading={loadingMore}
+                        onLoadMore={loadMore}
+                        threshold={300}
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {displayedGames.map((game, index) => (
+                            <div key={`${game.id}-${index}`} className={`${game.bgColor} border border-gray-600 rounded-xl p-6 hover:border-gray-500 transition-all group hover:scale-105 relative overflow-hidden h-full flex flex-col min-h-80`}>
+                              <div className="absolute top-2 right-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  game.status === 'live' ? 'bg-red-500 animate-pulse' :
+                                  game.status === 'soon' ? 'bg-green-500 animate-pulse' : 'bg-blue-500'
+                                }`}></div>
+                              </div>
+
+                              <div className="flex-1 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-base ${game.color}`}>
+                                      {game.sportIcon}
+                                    </div>
+                                    <div>
+                                      <div className="text-sm text-gray-400">{game.sport}</div>
+                                      <div className="text-sm font-medium text-white">{game.league}</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mb-3 flex-1">
+                                  <div className="text-center">
+                                    <div className="text-lg font-semibold text-white mb-2">
+                                      {game.homeTeam} vs {game.awayTeam}
+                                    </div>
+                                    <div className="text-sm text-gray-300 mb-2">{game.date}</div>
+                                    <div className="text-base text-gray-200 mb-2 font-medium">{game.time}</div>
+                                    <div className={`text-sm px-2 py-1 rounded inline-block ${
+                                      game.status === 'live' ? 'text-red-400 bg-red-900 bg-opacity-20 font-bold' : 'text-blue-400 bg-blue-900 bg-opacity-20'
+                                    }`}>
+                                      {game.status === 'live' ? '🔴 EN VIVO' : 'Programado'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-gray-600 mt-auto">
+                                <div className="space-y-3">
+                                  <Link
+                                    href={`/sports/challenges/${game.id}?match=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&league=${encodeURIComponent(game.league)}&sport=${encodeURIComponent(game.sport)}`}
+                                    className="block w-full py-2 px-3 rounded-lg transition-all font-medium text-sm bg-blue-600 hover:bg-blue-700 text-white text-center group-hover:shadow-lg hover:scale-105 no-underline"
+                                  >
+                                    🎯 Ver Retos ({Math.floor(Math.random() * 50) + 5})
+                                  </Link>
+                                  <Link
+                                    href={`/sports/create?matchId=${game.id}&matchTitle=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&teams=${encodeURIComponent(game.homeTeam + ' vs ' + game.awayTeam)}&date=${encodeURIComponent(game.date)}&time=${encodeURIComponent(game.time)}&league=${encodeURIComponent(game.league)}&sport=${encodeURIComponent(game.sport)}${gameCount > 1 ? `&gameCount=${gameCount}` : ''}`}
+                                    className="block w-full py-2 px-3 rounded-lg transition-all font-medium text-sm bg-green-600 hover:bg-green-700 text-white text-center group-hover:shadow-lg hover:scale-105 no-underline"
+                                  >
+                                    ➕ Crear Reto
+                                  </Link>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </InfiniteScrollLoader>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-      
-      {/* Footer */}
+
       <Footer />
+      <ApiStatusIndicator />
+      <ForceDataRefresh />
     </div>
   );
 }
