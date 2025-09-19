@@ -4,9 +4,9 @@ import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BetType, ResolutionMode } from '@/types/betting';
-import HomeButton from '@/components/HomeButton';
 import Footer from '@/components/Footer';
-import BackButton from '@/components/BackButton';
+import NavigationButtons from '@/components/NavigationButtons';
+import { publishedChallenges } from '@/lib/publishedChallenges';
 // Datos de eventos de fútbol inline para evitar problemas de importación JSON
 
 interface MatchData {
@@ -689,7 +689,7 @@ function CreateBetFromSportsContent() {
 
     return baseOptions.map(option => ({
       ...option,
-      options: option.options.map(opt => 
+      options: option.options?.map(opt =>
         opt
           .replace(/Victoria Local/g, `Victoria ${homeTeam}`)
           .replace(/Victoria Visitante/g, `Victoria ${awayTeam}`)
@@ -838,16 +838,13 @@ function CreateBetFromSportsContent() {
   if (!betConfig) {
     return (
       <div className="min-h-screen bg-[#1a1d29] text-white">
+        <NavigationButtons />
         <div className="bg-[#1a1d29] border-b border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="font-semibold text-xl">Crear Reto Deportivo</h1>
               <p className="text-sm text-gray-400">Primero selecciona el tipo de reto</p>
             </div>
-            <BackButton 
-              fallbackUrl="/sports"
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-            />
           </div>
         </div>
         
@@ -878,12 +875,6 @@ function CreateBetFromSportsContent() {
                     🎯 Ir a Crear Reto
                   </button>
                 </Link>
-                <BackButton 
-                  fallbackUrl="/sports"
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg"
-                >
-                  ← Volver a Deportes
-                </BackButton>
               </div>
             </div>
           </div>
@@ -911,18 +902,14 @@ function CreateBetFromSportsContent() {
     <div className="min-h-screen bg-[#1a1d29] text-white w-full">
       {/* Header */}
       <div className="bg-[#1a1d29] border-b border-gray-700 px-2 lg:px-4 xl:px-6 py-4 sticky top-0 z-50 w-full">
+        <NavigationButtons />
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center space-x-4">
-            <HomeButton />
             <div>
               <h1 className="font-semibold text-lg lg:text-xl">Crear Reto: {betConfig?.title}</h1>
               <p className="text-xs lg:text-sm text-gray-400">Configura tu reto para este partido</p>
             </div>
           </div>
-          <BackButton 
-            fallbackUrl="/sports"
-            className="bg-gray-600 hover:bg-gray-700 text-white px-3 lg:px-4 py-2 rounded-lg transition-colors text-sm"
-          />
         </div>
       </div>
 
@@ -2858,8 +2845,41 @@ function CreateBetFromSportsContent() {
                     exactModeConfig,
                     matchData
                   });
-                  // Aquí iría la lógica para crear el reto
-                  alert('¡Reto creado exitosamente! (Demo)');
+                  // Crear y publicar el reto
+                  try {
+                    const publishedChallenge = publishedChallenges.publishChallenge({
+                      title: betConfig.title,
+                      type: selectedModality as 'battle-royal' | 'group-balanced' | 'prediction',
+                      description: betConfig.description,
+                      matchData: {
+                        id: matchData.id,
+                        title: matchData.title,
+                        teams: matchData.teams,
+                        date: matchData.date,
+                        time: matchData.time,
+                        league: matchData.league,
+                        sport: matchData.sport
+                      },
+                      betConfig,
+                      selectedPredictions,
+                      modality: selectedModality,
+                      resolutionMode: selectedResolutionMode || 'exact',
+                      entryAmount: '50.00', // Valor por defecto, se puede hacer configurable
+                      createdBy: 'user_demo', // Se reemplazará con el ID del usuario real
+                      maxParticipants: selectedModality === 'battle-royal' ? 20 :
+                                     selectedModality === 'group-balanced' ? 12 : 2,
+                      prize: '500.00' // Se calculará basado en entry amount y participantes
+                    });
+
+                    console.log('✅ Reto publicado:', publishedChallenge);
+                    alert(`¡Reto "${betConfig.title}" creado y publicado exitosamente!`);
+
+                    // Redirigir a la página de retos del partido
+                    router.push(`/sports/challenges/${matchData.id}?match=${encodeURIComponent(matchData.title)}&league=${encodeURIComponent(matchData.league)}&sport=${encodeURIComponent(matchData.sport)}`);
+                  } catch (error) {
+                    console.error('Error publicando reto:', error);
+                    alert('Error al publicar el reto. Inténtalo de nuevo.');
+                  }
                 } else {
                   alert('Por favor completa toda la configuración antes de crear el reto');
                 }

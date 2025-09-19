@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { UserBet, UserStats, Transaction, UserBalance, BetType, BetStatus, ResolutionMode } from '@/types/betting';
 import { useBalance } from '@/hooks/useBalance';
 import DepositModal from './DepositModal';
+import { publishedChallenges } from '@/lib/publishedChallenges';
+import { userParticipations } from '@/lib/userParticipations';
 
 // Datos mock para desarrollo
 const mockUserBalance: UserBalance = {
@@ -28,7 +30,16 @@ const mockUserStats: UserStats = {
   currentStreak: 3
 };
 
-// Lista vacía inicialmente - se llenará cuando el usuario se una o cree retos
+// Los retos del usuario se cargarán dinámicamente desde publishedChallenges
+const getUserChallenges = () => {
+  try {
+    return publishedChallenges.getUserChallenges('user_demo');
+  } catch (error) {
+    console.error('Error loading user challenges:', error);
+    return [];
+  }
+};
+
 const mockUserBets: UserBet[] = [];
 
 const mockTransactions: Transaction[] = [
@@ -79,6 +90,8 @@ export default function UserPanel({ username }: UserPanelProps) {
   const { balance, transactions, isLoading, addTransaction, updateBalance } = useBalance();
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [userBets, setUserBets] = useState<UserBet[]>(mockUserBets);
+  const [userChallenges, setUserChallenges] = useState<any[]>([]);
+  const [joinedChallenges, setJoinedChallenges] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [expandedStats, setExpandedStats] = useState(false);
@@ -94,6 +107,32 @@ export default function UserPanel({ username }: UserPanelProps) {
   // Función para refrescar datos
   const handleRefresh = async () => {
     setIsRefreshing(true);
+
+    try {
+      // Cargar retos creados por el usuario
+      const challenges = getUserChallenges();
+      setUserChallenges(challenges);
+
+      // Cargar retos a los que se ha unido el usuario
+      const participations = userParticipations.getUserParticipations('user_demo');
+      const joinedChallengesData = participations.map(participation => {
+        // Buscar el reto completo en publishedChallenges
+        const allChallenges = publishedChallenges.getAllChallenges();
+        const challengeData = allChallenges.find(c => c.id === participation.challengeId);
+
+        return {
+          ...participation,
+          challengeData
+        };
+      }).filter(item => item.challengeData); // Solo incluir los que encontramos
+
+      setJoinedChallenges(joinedChallengesData);
+
+      console.log(`📊 Loaded ${challenges.length} created challenges and ${joinedChallengesData.length} joined challenges`);
+    } catch (error) {
+      console.error('Error refreshing user challenges:', error);
+    }
+
     // Simular llamada a API
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsRefreshing(false);
@@ -110,10 +149,57 @@ export default function UserPanel({ username }: UserPanelProps) {
     }, 3000);
   };
 
+  // Cargar retos del usuario al inicializar
+  useEffect(() => {
+    const loadUserChallenges = () => {
+      try {
+        // Cargar retos creados
+        const challenges = getUserChallenges();
+        setUserChallenges(challenges);
+
+        // Cargar retos unidos
+        const participations = userParticipations.getUserParticipations('user_demo');
+        const joinedChallengesData = participations.map(participation => {
+          const allChallenges = publishedChallenges.getAllChallenges();
+          const challengeData = allChallenges.find(c => c.id === participation.challengeId);
+          return {
+            ...participation,
+            challengeData
+          };
+        }).filter(item => item.challengeData);
+
+        setJoinedChallenges(joinedChallengesData);
+
+        console.log(`📊 Initial load: ${challenges.length} created, ${joinedChallengesData.length} joined`);
+      } catch (error) {
+        console.error('Error loading initial user challenges:', error);
+      }
+    };
+
+    loadUserChallenges();
+  }, []);
+
   // Auto-refresh cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isRefreshing) {
+        // También actualizar retos del usuario
+        const challenges = getUserChallenges();
+        setUserChallenges(challenges);
+
+        // Actualizar retos unidos
+        const participations = userParticipations.getUserParticipations('user_demo');
+        const joinedChallengesData = participations.map(participation => {
+          const allChallenges = publishedChallenges.getAllChallenges();
+          const challengeData = allChallenges.find(c => c.id === participation.challengeId);
+          return {
+            ...participation,
+            challengeData
+          };
+        }).filter(item => item.challengeData);
+
+        setJoinedChallenges(joinedChallengesData);
+
         addNotification('info', '📊 Datos actualizados automáticamente');
       }
     }, 30000);
@@ -141,7 +227,7 @@ export default function UserPanel({ username }: UserPanelProps) {
         status: 'active'
       },
       {
-        id: '2', 
+        id: '2',
         title: 'Lakers vs Warriors',
         league: 'NBA',
         betAmount: '$75',
@@ -163,7 +249,7 @@ export default function UserPanel({ username }: UserPanelProps) {
     ];
 
     // Filtrar resultados por el query
-    const filtered = mockResults.filter(result => 
+    const filtered = mockResults.filter(result =>
       result.title.toLowerCase().includes(query.toLowerCase()) ||
       result.league.toLowerCase().includes(query.toLowerCase()) ||
       result.sport.toLowerCase().includes(query.toLowerCase())
@@ -177,12 +263,12 @@ export default function UserPanel({ username }: UserPanelProps) {
   useEffect(() => {
     // Solo ejecutar en el cliente para evitar hydration issues
     if (typeof window === 'undefined') return;
-    
+
     // Verificar si el usuario se unió al reto de challenge desde URL params
     const urlParams = new URLSearchParams(window.location.search);
     const joined = urlParams.get('joined');
     const challengeId = urlParams.get('id');
-    
+
     if (joined === 'true' && challengeId === 'challenge_001') {
       const newBet: UserBet = {
         id: challengeId,
@@ -201,7 +287,7 @@ export default function UserPanel({ username }: UserPanelProps) {
         icon: '⚽',
         iconBg: 'bg-green-500'
       };
-      
+
       // Usar setUserBets con función para evitar duplicados
       setUserBets(prev => {
         const existingBet = prev.find(bet => bet.id === challengeId);
@@ -296,11 +382,11 @@ export default function UserPanel({ username }: UserPanelProps) {
     <div className="w-80 bg-[#1a1d29] border-l border-gray-700 p-4 flex flex-col">
       {/* Imagen m12 */}
       <div className="mb-4 flex justify-center">
-        <img 
-          src="/m12.png" 
-          alt="M12 Logo" 
-          width={150} 
-          height={75} 
+        <img
+          src="/m12.png"
+          alt="M12 Logo"
+          width={150}
+          height={75}
           className="drop-shadow-lg"
           style={{
             objectFit: 'contain',
@@ -334,7 +420,7 @@ export default function UserPanel({ username }: UserPanelProps) {
           </div>
         </div>
         <p className="text-gray-400 text-sm mb-3">Gestiona tus retos activos</p>
-        
+
         {/* Balance resumen */}
         <div className="bg-[#2a2d47] rounded-lg p-3 mb-4 border border-gray-600">
           <div className="flex items-center justify-between mb-3">
@@ -368,25 +454,25 @@ export default function UserPanel({ username }: UserPanelProps) {
               Acciones Rápidas
             </h3>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <button 
+              <button
                 onClick={() => addNotification('info', '🎯 Creando reto rápido...')}
                 className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 py-2 px-3 rounded transition-all hover:scale-105"
               >
                 🎯 Reto Rápido
               </button>
-              <button 
+              <button
                 onClick={() => addNotification('info', '💰 Abriendo depósito...')}
                 className="bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 px-3 rounded transition-all hover:scale-105"
               >
                 💰 Depositar
               </button>
-              <button 
+              <button
                 onClick={() => addNotification('info', '📊 Generando reporte...')}
                 className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 py-2 px-3 rounded transition-all hover:scale-105"
               >
                 📊 Reporte
               </button>
-              <button 
+              <button
                 onClick={() => addNotification('warning', '⚙️ Configuraciones proximamente...')}
                 className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-400 py-2 px-3 rounded transition-all hover:scale-105"
               >
@@ -443,75 +529,197 @@ export default function UserPanel({ username }: UserPanelProps) {
       <div className="flex-1 overflow-y-auto">
         {selectedTab === 'posiciones' && (
           <div className="space-y-3">
-            {userBets.length === 0 ? (
+            {/* Sección de Retos Creados */}
+            {userChallenges.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-white font-medium mb-3 flex items-center">
+                  <span className="mr-2">🎯</span>
+                  Mis Retos Creados ({userChallenges.length})
+                </h4>
+                <div className="space-y-2">
+                  {userChallenges.map((challenge) => (
+                    <div key={challenge.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white mr-3 text-sm">
+                            🎯
+                          </div>
+                          <div>
+                            <div className="text-white font-medium text-sm">{challenge.title}</div>
+                            <div className="text-gray-400 text-xs">{challenge.matchData.league} • {challenge.matchData.sport}</div>
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          challenge.status === 'active' ? 'bg-green-600/20 text-green-400' :
+                          challenge.status === 'full' ? 'bg-yellow-600/20 text-yellow-400' :
+                          'bg-red-600/20 text-red-400'
+                        }`}>
+                          {challenge.status === 'active' ? '🟢 Activo' :
+                           challenge.status === 'full' ? '🟡 Lleno' : '❌ Finalizado'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Entrada</span>
+                          <span className="text-white font-medium">${challenge.entryAmount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Participantes</span>
+                          <span className="text-blue-400 font-medium">{challenge.participants}/{challenge.maxParticipants}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Premio</span>
+                          <span className="text-yellow-400 font-medium">${challenge.prize}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Partido</span>
+                          <span className="text-white font-medium">{challenge.matchData.title}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sección de Retos Unidos */}
+            {joinedChallenges.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-white font-medium mb-3 flex items-center">
+                  <span className="mr-2">🎮</span>
+                  Retos Unidos ({joinedChallenges.length})
+                </h4>
+                <div className="space-y-2">
+                  {joinedChallenges.map((participation) => (
+                    <div key={participation.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white mr-3 text-sm">
+                            🎮
+                          </div>
+                          <div>
+                            <div className="text-white font-medium text-sm">{participation.challengeData.title}</div>
+                            <div className="text-gray-400 text-xs">{participation.challengeData.matchData.league} • {participation.challengeData.matchData.sport}</div>
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          participation.status === 'active' ? 'bg-green-600/20 text-green-400' :
+                          participation.status === 'won' ? 'bg-blue-600/20 text-blue-400' :
+                          participation.status === 'lost' ? 'bg-red-600/20 text-red-400' :
+                          'bg-yellow-600/20 text-yellow-400'
+                        }`}>
+                          {participation.status === 'active' ? '🟢 Activo' :
+                           participation.status === 'won' ? '🏆 Ganado' :
+                           participation.status === 'lost' ? '❌ Perdido' : '⏳ Pendiente'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Mi entrada</span>
+                          <span className="text-white font-medium">${participation.entryAmount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Estado del reto</span>
+                          <span className="text-blue-400 font-medium">{participation.challengeData.participants}/{participation.challengeData.maxParticipants}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Premio total</span>
+                          <span className="text-yellow-400 font-medium">${participation.challengeData.prize}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Partido</span>
+                          <span className="text-white font-medium">{participation.challengeData.matchData.title}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Unido el</span>
+                          <span className="text-gray-300 font-medium">{new Date(participation.joinedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sección de Apuestas/Posiciones Regulares */}
+            {userBets.length === 0 && userChallenges.length === 0 && joinedChallenges.length === 0 ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-gray-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">📊</span>
                 </div>
                 <h3 className="text-white font-medium mb-2">No hay posiciones activas</h3>
                 <p className="text-gray-400 text-sm">
-                  Únete a retos para ver tus posiciones aquí
+                  Crea o únete a retos para ver tus posiciones aquí
                 </p>
               </div>
-            ) : (
-              // Lista de posiciones cuando hay retos
-              userBets.map((bet) => (
-                <div key={bet.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 ${bet.iconBg} rounded-lg flex items-center justify-center text-white mr-3 text-sm`}>
-                        {bet.icon}
+            ) : userBets.length > 0 ? (
+              <div>
+                <h4 className="text-white font-medium mb-3 flex items-center">
+                  <span className="mr-2">📈</span>
+                  Posiciones Activas ({userBets.length})
+                </h4>
+                <div className="space-y-2">
+                  {userBets.map((bet) => (
+                    <div key={bet.id} className="bg-[#2a2d47] rounded-lg p-4 border border-gray-600">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center">
+                          <div className={`w-8 h-8 ${bet.iconBg} rounded-lg flex items-center justify-center text-white mr-3 text-sm`}>
+                            {bet.icon}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium text-sm">{bet.title}</div>
+                            <div className="text-gray-400 text-xs">{bet.league} • {getBetTypeLabel(bet.betType)}</div>
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${getBetStatusColor(bet.status)}`}>
+                          {bet.status === BetStatus.ACTIVE ? '🟢 Activo' :
+                           bet.status === BetStatus.PENDING ? '🟡 Pendiente' :
+                           bet.status === BetStatus.RESOLVED ? '✅ Ganado' :
+                           bet.status === BetStatus.LOCKED ? '🔒 Bloqueado' : '❌ Cancelado'}
+                        </span>
                       </div>
-                      <div>
-                        <div className="text-white font-medium text-sm">{bet.title}</div>
-                        <div className="text-gray-400 text-xs">{bet.league} • {getBetTypeLabel(bet.betType)}</div>
-                      </div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getBetStatusColor(bet.status)}`}>
-                      {bet.status === BetStatus.ACTIVE ? '🟢 Activo' :
-                       bet.status === BetStatus.PENDING ? '🟡 Pendiente' :
-                       bet.status === BetStatus.RESOLVED ? '✅ Ganado' :
-                       bet.status === BetStatus.LOCKED ? '🔒 Bloqueado' : '❌ Cancelado'}
-                    </span>
-                  </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Apuesta</span>
-                      <span className="text-white font-medium">${bet.stake}</span>
-                    </div>
-                    {bet.userPrediction && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Mi predicción</span>
-                        <span className="text-blue-400 font-medium">{bet.userPrediction}</span>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Apuesta</span>
+                          <span className="text-white font-medium">${bet.stake}</span>
+                        </div>
+                        {bet.userPrediction && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Mi predicción</span>
+                            <span className="text-blue-400 font-medium">{bet.userPrediction}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Participantes</span>
+                          <span className="text-white">{bet.participants}/{bet.maxParticipants}</span>
+                        </div>
+                        {bet.winnings && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Ganancia</span>
+                            <span className="text-green-400 font-bold">+${bet.winnings}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Participantes</span>
-                      <span className="text-white">{bet.participants}/{bet.maxParticipants}</span>
-                    </div>
-                    {bet.winnings && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Ganancia</span>
-                        <span className="text-green-400 font-bold">+${bet.winnings}</span>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="mt-3 pt-2 border-t border-gray-600 flex justify-between items-center text-xs">
-                    <span className="text-gray-500">📅 {bet.dateCreated}</span>
-                    <div className="flex space-x-2">
-                      <button className="text-blue-400 hover:underline">Ver detalles</button>
-                      {username === '77paladio' && (
-                        <Link href="/admin">
-                          <button className="text-red-400 hover:underline text-xs">Admin</button>
-                        </Link>
-                      )}
+                      <div className="mt-3 pt-2 border-t border-gray-600 flex justify-between items-center text-xs">
+                        <span className="text-gray-500">📅 {bet.dateCreated}</span>
+                        <div className="flex space-x-2">
+                          <button className="text-blue-400 hover:underline">Ver detalles</button>
+                          {username === '77paladio' && (
+                            <Link href="/admin">
+                              <button className="text-red-400 hover:underline text-xs">Admin</button>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))
-            )}
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -655,9 +863,9 @@ export default function UserPanel({ username }: UserPanelProps) {
           </div>
         )}
       </div>
-      
+
       {/* Modal de depósito */}
-      <DepositModal 
+      <DepositModal
         isOpen={showDepositModal}
         onClose={() => setShowDepositModal(false)}
         onDeposit={handleDeposit}

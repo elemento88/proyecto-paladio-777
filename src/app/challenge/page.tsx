@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BetType, ResolutionMode } from '@/types/betting';
 import { getResolutionModeInfo, getResolutionModeTheme } from '@/utils/resolutionModes';
-import BackButton from '@/components/BackButton';
+import NavigationButtons from '@/components/NavigationButtons';
 
 interface ChallengeDetailProps {
   id?: string;
@@ -378,10 +378,10 @@ export default function ChallengePage({ id }: ChallengeDetailProps) {
 
   return (
     <div className="min-h-screen bg-[#1a1d29] text-white p-6">
+      <NavigationButtons />
       <div className="max-w-2xl mx-auto">
         {/* Header con botón de regreso */}
         <div className="mb-6">
-          <BackButton fallbackUrl="/sports" />
           
           {/* Mensaje de confirmación si recién se unió */}
           {hasJoined && (
@@ -508,7 +508,6 @@ export default function ChallengePage({ id }: ChallengeDetailProps) {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium flex items-center justify-center"
               >
                 <span>Unirse al Reto</span>
-                <span className="ml-2">→</span>
               </button>
             )}
           </div>

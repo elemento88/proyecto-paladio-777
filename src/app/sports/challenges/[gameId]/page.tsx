@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import BackButton from '@/components/BackButton';
+import NavigationButtons from '@/components/NavigationButtons';
 import Footer from '@/components/Footer';
+import { publishedChallenges } from '@/lib/publishedChallenges';
+import { userParticipations } from '@/lib/userParticipations';
 
 interface Challenge {
   id: string;
@@ -34,58 +36,180 @@ export default function GameChallengesPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'Battle Royal' | '1v1 Duel' | 'Group Balanced' | 'Tournament'>('all');
+  const [joiningChallenge, setJoiningChallenge] = useState<string | null>(null);
 
-  // Generar retos mock para este juego específico
+  // Cargar retos reales para este juego específico
   useEffect(() => {
-    const generateChallenges = () => {
+    const loadChallenges = () => {
+      try {
+        // Obtener retos publicados para este partido
+        const publishedMatchChallenges = publishedChallenges.getChallengesByMatch(gameId);
+
+        // Convertir a formato Challenge para mantener compatibilidad
+        const convertedChallenges: Challenge[] = publishedMatchChallenges.map(challenge => ({
+          id: challenge.id,
+          title: challenge.title,
+          type: challenge.type === 'battle-royal' ? 'Battle Royal' :
+                challenge.type === 'group-balanced' ? 'Group Balanced' :
+                challenge.type === 'prediction' ? '1v1 Duel' : 'Tournament',
+          description: challenge.description,
+          stake: `$${challenge.entryAmount}`,
+          participants: `${challenge.participants}/${challenge.maxParticipants}`,
+          maxParticipants: challenge.maxParticipants,
+          timeRemaining: calculateTimeRemaining(challenge.matchData.date, challenge.matchData.time),
+          creator: challenge.createdBy,
+          odds: calculateOdds(challenge.participants, challenge.maxParticipants),
+          status: challenge.status as Challenge['status'],
+          prize: `$${challenge.prize}`,
+          icon: getIconForSport(sport),
+          iconBg: getIconBgForSport(sport)
+        }));
+
+        // Si no hay retos reales, generar algunos mock
+        if (convertedChallenges.length === 0) {
+          const mockChallenges = generateMockChallenges();
+          setChallenges(mockChallenges);
+        } else {
+          setChallenges(convertedChallenges);
+        }
+
+        console.log(`📊 Loaded ${convertedChallenges.length} published challenges for match ${gameId}`);
+      } catch (error) {
+        console.error('Error loading challenges:', error);
+        // Fallback a mock challenges en caso de error
+        setChallenges(generateMockChallenges());
+      }
+
+      setLoading(false);
+    };
+
+    // Función auxiliar para calcular tiempo restante
+    const calculateTimeRemaining = (date: string, time: string): string => {
+      try {
+        const matchDateTime = new Date(`${date} ${time}`);
+        const now = new Date();
+        const diff = matchDateTime.getTime() - now.getTime();
+
+        if (diff <= 0) return 'En curso';
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+        return `${hours}h ${minutes}m`;
+      } catch {
+        return '24h 0m';
+      }
+    };
+
+    // Función auxiliar para calcular odds
+    const calculateOdds = (participants: number, maxParticipants: number): string => {
+      const ratio = participants / maxParticipants;
+      const odds = 1.5 + (1 - ratio) * 2;
+      return `${odds.toFixed(2)}x`;
+    };
+
+    // Función para generar mock challenges si no hay reales
+    const generateMockChallenges = (): Challenge[] => {
       const challengeTypes: Challenge['type'][] = ['Battle Royal', '1v1 Duel', 'Group Balanced', 'Tournament'];
       const challengeTemplates = [
         { title: 'Ganador del Partido', description: 'Predicción del equipo ganador' },
         { title: 'Total de Goles/Puntos', description: 'Predicción del marcador total' },
         { title: 'Primer Gol/Punto', description: 'Quién anotará primero' },
-        { title: 'Resultado Exacto', description: 'Marcador exacto del partido' },
-        { title: 'Mejor Jugador', description: 'MVP del encuentro' },
-        { title: 'Tarjetas/Faltas', description: 'Número de incidencias' },
-        { title: 'Tiempo de Primer Gol', description: 'Minuto del primer tanto' },
-        { title: 'Corners/Saques', description: 'Estadísticas de juego' }
+        { title: 'Resultado Exacto', description: 'Marcador exacto del partido' }
       ];
 
-      const mockChallenges: Challenge[] = [];
-      const numChallenges = Math.floor(Math.random() * 25) + 15; // 15-40 retos
-
-      for (let i = 0; i < numChallenges; i++) {
-        const template = challengeTemplates[Math.floor(Math.random() * challengeTemplates.length)];
+      return challengeTemplates.map((template, i) => {
         const type = challengeTypes[Math.floor(Math.random() * challengeTypes.length)];
-        const participants = Math.floor(Math.random() * 15) + 2;
-        const maxParticipants = Math.floor(Math.random() * 20) + participants;
-        const stake = Math.floor(Math.random() * 200) + 25;
+        const participants = Math.floor(Math.random() * 8) + 2;
+        const maxParticipants = Math.floor(Math.random() * 10) + participants;
+        const stake = Math.floor(Math.random() * 100) + 25;
 
-        mockChallenges.push({
-          id: `challenge-${gameId}-${i}`,
+        return {
+          id: `mock-challenge-${gameId}-${i}`,
           title: `${template.title} - ${match}`,
           type,
           description: `${template.description} | ${league} | ${sport}`,
           stake: `$${stake}`,
           participants: `${participants}/${maxParticipants}`,
           maxParticipants,
-          timeRemaining: `${Math.floor(Math.random() * 48) + 1}h ${Math.floor(Math.random() * 60)}m`,
-          creator: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
-          odds: `${(Math.random() * 2 + 1.5).toFixed(2)}x`,
+          timeRemaining: `${Math.floor(Math.random() * 24) + 1}h ${Math.floor(Math.random() * 60)}m`,
+          creator: `demo_user_${i}`,
+          odds: `${(Math.random() * 1.5 + 1.5).toFixed(2)}x`,
           status: participants >= maxParticipants ? 'full' : 'active',
           prize: `$${Math.floor(stake * (Math.random() * 0.5 + 1.5))}`,
           icon: getIconForSport(sport),
           iconBg: getIconBgForSport(sport)
-        });
-      }
-
-      return mockChallenges.sort((a, b) => b.maxParticipants - a.maxParticipants);
+        };
+      });
     };
 
-    setTimeout(() => {
-      setChallenges(generateChallenges());
-      setLoading(false);
-    }, 500);
+    setTimeout(loadChallenges, 500);
   }, [gameId, match, league, sport]);
+
+  // Función para unirse a un reto
+  const handleJoinChallenge = async (challenge: Challenge) => {
+    const userId = 'user_demo'; // Se reemplazará con el ID del usuario real
+
+    try {
+      setJoiningChallenge(challenge.id);
+
+      // Verificar si el usuario ya está en este reto
+      const isAlreadyJoined = userParticipations.isUserInChallenge(userId, challenge.id);
+
+      if (isAlreadyJoined) {
+        alert('Ya estás participando en este reto');
+        return;
+      }
+
+      // Verificar si el reto está disponible
+      if (challenge.status !== 'active') {
+        alert('Este reto ya no está disponible');
+        return;
+      }
+
+      // Crear participación del usuario
+      const participation = userParticipations.joinChallenge(
+        userId,
+        challenge.id,
+        challenge.stake.replace('$', ''), // Remover el símbolo $
+        [] // Predicciones se pueden agregar después
+      );
+
+      // Actualizar el reto en publishedChallenges (incrementar participantes)
+      const joined = publishedChallenges.joinChallenge(challenge.id, userId);
+
+      if (joined) {
+        // Recargar retos para reflejar el cambio
+        const updatedChallenges = challenges.map(c => {
+          if (c.id === challenge.id) {
+            const parts = c.participants.split('/');
+            const currentParticipants = parseInt(parts[0]) + 1;
+            const maxParticipants = parseInt(parts[1]);
+
+            return {
+              ...c,
+              participants: `${currentParticipants}/${maxParticipants}`,
+              status: currentParticipants >= maxParticipants ? 'full' as Challenge['status'] : c.status
+            };
+          }
+          return c;
+        });
+
+        setChallenges(updatedChallenges);
+
+        alert(`¡Te has unido exitosamente al reto "${challenge.title}"!`);
+        console.log('✅ User joined challenge:', participation);
+      } else {
+        alert('Error al unirse al reto. Inténtalo de nuevo.');
+      }
+
+    } catch (error) {
+      console.error('Error joining challenge:', error);
+      alert('Error al unirse al reto. Inténtalo de nuevo.');
+    } finally {
+      setJoiningChallenge(null);
+    }
+  };
 
   const getIconForSport = (sport: string): string => {
     const icons: Record<string, string> = {
@@ -130,6 +254,7 @@ export default function GameChallengesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white">
+        <NavigationButtons />
         <div className="h-16 bg-transparent"></div>
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-center py-20">
@@ -146,13 +271,13 @@ export default function GameChallengesPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      <NavigationButtons />
       {/* Espacio para el header fijo */}
       <div className="h-16 bg-transparent"></div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <BackButton />
           <div className="mt-4">
             <div className="flex items-center space-x-3 mb-2">
               <div className={`w-10 h-10 ${getIconBgForSport(sport)} rounded-lg flex items-center justify-center text-xl`}>
@@ -256,16 +381,18 @@ export default function GameChallengesPage() {
 
               {/* Action Button */}
               <button
+                onClick={() => handleJoinChallenge(challenge)}
+                disabled={challenge.status === 'ended' || challenge.status === 'full' || joiningChallenge === challenge.id}
                 className={`w-full py-2 px-4 rounded-lg font-medium text-sm transition-all ${
-                  challenge.status === 'active'
+                  challenge.status === 'active' && joiningChallenge !== challenge.id
                     ? 'bg-purple-600 hover:bg-purple-700 text-white group-hover:shadow-lg hover:scale-105'
                     : challenge.status === 'full'
-                    ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                    ? 'bg-yellow-600 text-white cursor-not-allowed'
                     : 'bg-gray-600 text-gray-300 cursor-not-allowed'
                 }`}
-                disabled={challenge.status === 'ended'}
               >
-                {challenge.status === 'active' ? '🎯 Unirse al Reto' :
+                {joiningChallenge === challenge.id ? '⏳ Uniéndose...' :
+                 challenge.status === 'active' ? '🎯 Unirse al Reto' :
                  challenge.status === 'full' ? '👥 Reto Lleno' : '❌ Reto Finalizado'}
               </button>
             </div>

@@ -13,6 +13,8 @@ import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks/useAuth';
 import { useBetting } from '@/hooks/useBetting';
 import { useChallenges } from '@/contexts/ChallengesContext';
+import { userParticipations } from '@/lib/userParticipations';
+import { publishedChallenges } from '@/lib/publishedChallenges';
 import BotManager from '@/components/BotManager';
 import BotSimulator from '@/components/BotSimulator';
 import TournamentCard from '@/components/TournamentCard';
@@ -473,7 +475,7 @@ export default function Home() {
 
   const confirmJoinBet = () => {
     console.log('Joining bet:', selectedChallenge, 'Amount:', betAmount, 'Prediction:', userPrediction);
-    
+
     const challenge = activeChallenges.find(c => c.id === selectedChallenge);
     if (!challenge) return;
 
@@ -490,6 +492,56 @@ export default function Home() {
     });
     setActiveChallenges(updatedChallenges);
 
+    // Primero, asegurar que el reto existe en publishedChallenges
+    try {
+      const existingChallenges = publishedChallenges.getAllChallenges();
+      const challengeExists = existingChallenges.find(c => c.id === selectedChallenge);
+
+      if (!challengeExists) {
+        // Convertir el challenge del formato activeChallenges al formato publishedChallenges
+        const [currentParticipants, maxParticipants] = challenge.participants.split('/');
+        const publishedChallenge = {
+          id: challenge.id,
+          title: challenge.title,
+          type: challenge.type as any,
+          entryAmount: parseInt(challenge.stake.replace('$', '')),
+          maxParticipants: parseInt(maxParticipants),
+          participants: parseInt(currentParticipants) + 1,
+          prize: parseInt(challenge.stake.replace('$', '')) * parseInt(maxParticipants) * 0.95, // 5% fee
+          status: 'active',
+          creator: 'system',
+          createdAt: new Date().toISOString(),
+          matchData: {
+            id: challenge.id,
+            title: challenge.title,
+            teams: challenge.title,
+            league: challenge.sport || 'General',
+            sport: challenge.sport || 'General',
+            date: new Date().toLocaleDateString(),
+            time: '00:00'
+          }
+        };
+
+        // Guardar el challenge en publishedChallenges
+        const allChallenges = publishedChallenges.getAllChallenges();
+        allChallenges.push(publishedChallenge);
+        localStorage.setItem('publishedChallenges', JSON.stringify(allChallenges));
+        console.log('✅ Challenge guardado en publishedChallenges');
+      }
+
+      // Ahora guardar la participación del usuario
+      userParticipations.joinChallenge(
+        'user_demo', // userId
+        selectedChallenge || '', // challengeId
+        parseFloat(betAmount), // entryAmount
+        userPrediction, // prediction
+        'active' // status
+      );
+      console.log('✅ Participación guardada exitosamente');
+    } catch (error) {
+      console.error('❌ Error guardando participación:', error);
+    }
+
     // Agregar transacción
     addTransaction({
       type: 'BET_PLACED',
@@ -502,7 +554,7 @@ export default function Home() {
 
     // Actualizar balance
     updateBalance(parseFloat(betAmount), 'bet');
-    
+
     setShowJoinModal(false);
     setSelectedChallenge(null);
     setBetAmount('50');
@@ -1225,17 +1277,11 @@ export default function Home() {
                         <div className="flex items-center space-x-6">
                           <div className="flex space-x-2">
                             <Link href="/challenge">
-                              <button className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-lg font-medium transition-colors">
-                                Ver Detalles
+                              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center">
+                                Unirme a Reto
+                                <span className="ml-2">→</span>
                               </button>
                             </Link>
-                            <button 
-                              onClick={() => handleJoinBet(challenge.id)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center transition-colors"
-                            >
-                              <span>Unirse</span>
-                              <span className="ml-2">→</span>
-                            </button>
                           </div>
                         </div>
                       </div>

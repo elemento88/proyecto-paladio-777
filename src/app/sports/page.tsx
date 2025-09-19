@@ -7,13 +7,11 @@ import Footer from '@/components/Footer';
 import DatabaseDiagnostic from '@/components/DatabaseDiagnostic';
 import CacheStatus from '@/components/CacheStatus';
 import InfiniteScrollLoader from '@/components/InfiniteScrollLoader';
-import CacheDebugger from '@/components/CacheDebugger';
-import EventsForcer from '@/components/EventsForcer';
 import { useEventsLoader } from '@/hooks/useEventsLoader';
 import { LiveScore } from '@/types/sports';
 import { getTeamLogo, isImageUrl } from '@/lib/teamLogos';
 import ApiStatusIndicator from '@/components/ApiStatusIndicator';
-import ForceDataRefresh from '@/components/ForceDataRefresh';
+import NavigationButtons from '@/components/NavigationButtons';
 
 interface SportCategory {
   id: string;
@@ -314,8 +312,7 @@ export default function SportsPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <CacheDebugger />
-      <EventsForcer />
+      <NavigationButtons showHome={true} showBack={false} />
 
       {/* Espacio para el header fijo - SIN línea negra */}
       <div className="h-16 bg-transparent"></div>
@@ -628,7 +625,6 @@ export default function SportsPage() {
 
       <Footer />
       <ApiStatusIndicator />
-      <ForceDataRefresh />
     </div>
   );
 }

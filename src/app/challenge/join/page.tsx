@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import BackButton from '@/components/BackButton';
+import NavigationButtons from '@/components/NavigationButtons';
 import { BetType, ResolutionMode } from '@/types/betting';
 import { getResolutionModeInfo, getResolutionModeTheme } from '@/utils/resolutionModes';
 
@@ -120,10 +120,10 @@ export default function JoinChallengePage() {
 
   return (
     <div className="min-h-screen bg-[#1a1d29] text-white p-6">
+      <NavigationButtons />
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <BackButton fallbackUrl={`/challenge?id=${challengeId}`} />
         </div>
 
         {/* Información del partido */}
@@ -428,7 +428,6 @@ export default function JoinChallengePage() {
             ) : (
               <>
                 🎯 Unirse al Reto
-                <span className="ml-2">→</span>
               </>
             )}
           </button>
